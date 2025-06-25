@@ -1,0 +1,18 @@
+# Docker Compose for Company Recommendation System
+version: '3.8'
+
+services:
+  company-recommendation:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - "../Du lieu cung cap:/app/Du lieu cung cap:ro"  # Mount data directory as read-only
+    environment:
+      - PYTHONPATH=/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
