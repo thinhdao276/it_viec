@@ -242,9 +242,9 @@ if not UTILS_AVAILABLE:
 def load_data():
     """Load and preprocess the company data"""
     file_paths = [
-        "../Du lieu cung cap/Overview_Companies.xlsx",
         "Du lieu cung cap/Overview_Companies.xlsx",
-        "./Overview_Companies.xlsx"
+        "Du lieu cung cap/Overview_Companies.xlsx",
+        "Overview_Companies.xlsx"
     ]
     
     for file_path in file_paths:
