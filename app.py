@@ -26,6 +26,39 @@ try:
         create_industry_chart
     )
     UTILS_AVAILABLE = True
+    
+    # Override the load_and_preprocess_data function to add caching
+    def load_and_preprocess_data_cached(file_path):
+        """Load and preprocess data with caching"""
+        try:
+            # Create a preprocessed file path
+            base_name = os.path.splitext(os.path.basename(file_path))[0]
+            preprocessed_file = f"{base_name}_preprocessed.csv"
+            
+            # Check if preprocessed file exists and is newer than source
+            if os.path.exists(preprocessed_file):
+                source_time = os.path.getmtime(file_path)
+                preprocessed_time = os.path.getmtime(preprocessed_file)
+                
+                if preprocessed_time > source_time:
+                    # Load preprocessed data
+                    df_relevant_cols = pd.read_csv(preprocessed_file)
+                    return df_relevant_cols
+            
+            # If preprocessed file doesn't exist or is outdated, create it
+            df_relevant_cols = load_and_preprocess_data(file_path)
+            if df_relevant_cols is not None:
+                # Save preprocessed data for future use
+                df_relevant_cols.to_csv(preprocessed_file, index=False)
+            
+            return df_relevant_cols
+        except Exception as e:
+            st.error(f"Error loading data: {e}")
+            return None
+    
+    # Replace the original function
+    load_and_preprocess_data = load_and_preprocess_data_cached
+    
 except ImportError:
     UTILS_AVAILABLE = False
     # Import required libraries for inline implementations
@@ -60,7 +93,8 @@ st.markdown("""
         margin-bottom: 1rem;
     }
     .recommendation-card {
-        background-color: #f8f9fa;
+        background-color: #222831;
+        color: #f8f9fa;
         padding: 1rem;
         border-radius: 0.5rem;
         border-left: 4px solid #1f77b4;
@@ -68,7 +102,7 @@ st.markdown("""
     }
     .similarity-score {
         font-weight: bold;
-        color: #1f77b4;
+        color: #00adb5;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -89,8 +123,23 @@ if not UTILS_AVAILABLE:
         return ""
     
     def load_and_preprocess_data(file_path):
-        """Load and preprocess data"""
+        """Load and preprocess data with caching"""
         try:
+            # Create a preprocessed file path
+            base_name = os.path.splitext(os.path.basename(file_path))[0]
+            preprocessed_file = f"{base_name}_preprocessed.csv"
+            
+            # Check if preprocessed file exists and is newer than source
+            if os.path.exists(preprocessed_file):
+                source_time = os.path.getmtime(file_path)
+                preprocessed_time = os.path.getmtime(preprocessed_file)
+                
+                if preprocessed_time > source_time:
+                    # Load preprocessed data
+                    df_relevant_cols = pd.read_csv(preprocessed_file)
+                    return df_relevant_cols
+            
+            # If preprocessed file doesn't exist or is outdated, create it
             df = pd.read_excel(file_path)  # Load all data, not just 10 rows
             df_relevant_cols = df[['Company Name', 'Company overview', 'Company industry', 'Our key skills']].copy()
             df_relevant_cols.fillna("", inplace=True)
@@ -100,6 +149,10 @@ if not UTILS_AVAILABLE:
                 df_relevant_cols['Our key skills']
             )
             df_relevant_cols['preprocessed_text'] = df_relevant_cols['combined_text'].apply(preprocess_text)
+            
+            # Save preprocessed data for future use
+            df_relevant_cols.to_csv(preprocessed_file, index=False)
+            
             return df_relevant_cols
         except Exception as e:
             st.error(f"Error loading data: {e}")
@@ -240,16 +293,25 @@ if not UTILS_AVAILABLE:
 # Cache data loading
 @st.cache_data
 def load_data():
-    """Load and preprocess the company data"""
+    """Load and preprocess the company data with caching"""
     file_paths = [
-        "Du lieu cung cap/Overview_Companies.xlsx",
         "Du lieu cung cap/Overview_Companies.xlsx",
         "Overview_Companies.xlsx"
     ]
     
     for file_path in file_paths:
         try:
-            return load_and_preprocess_data(file_path)
+            with st.spinner(f"Loading data from {file_path}..."):
+                # Check if preprocessed CSV exists
+                base_name = os.path.splitext(os.path.basename(file_path))[0]
+                preprocessed_file = f"{base_name}_preprocessed.csv"
+                
+                if os.path.exists(preprocessed_file):
+                    st.info(f"✅ Using cached preprocessed data from {preprocessed_file}")
+                else:
+                    st.info(f"⏳ First-time processing - this may take a moment...")
+                
+                return load_and_preprocess_data(file_path)
         except:
             continue
     
