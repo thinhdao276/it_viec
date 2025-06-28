@@ -23,15 +23,5 @@
     "model_path": "trained_models/KNN.pkl",
     "model_name": "KNN",
     "file_size": 1346295
-  },
-  "LightGBM": {
-    "model_path": "trained_models/LightGBM.pkl",
-    "model_name": "LightGBM",
-    "file_size": 106309
-  },
-  "CatBoost": {
-    "model_path": "trained_models/CatBoost.pkl",
-    "model_name": "CatBoost",
-    "file_size": 1075641
   }
 }

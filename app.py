@@ -783,11 +783,43 @@ def display_recommendation_modeling_page(selected_model):
         # Load trained models (simulation for now)
         trained_models_info = load_trained_models_info()
         
-        # Model selection display
-        st.markdown(f"#### Selected Model: **{selected_model}**")
+        # Model selection for prediction
+        st.markdown("#### 🤖 Model Selection for Prediction")
         
-        if selected_model in trained_models_info:
-            model_info = trained_models_info[selected_model]
+        # Available models for prediction
+        prediction_models = [
+            "Random Forest",
+            "Logistic Regression", 
+            "LightGBM",
+            "CatBoost",
+            "SVM",
+            "KNN",
+            "Naive Bayes"
+        ]
+        
+        col1, col2, col3 = st.columns([2, 1, 1])
+        
+        with col1:
+            prediction_model = st.selectbox(
+                "Choose model for prediction:",
+                prediction_models + ["🔄 Compare All Models"],
+                index=prediction_models.index(selected_model) if selected_model in prediction_models else 0,
+                help="Select which trained model to use for making the prediction"
+            )
+        
+        with col2:
+            if st.button("📊 Model Info", help="Show detailed model information"):
+                if prediction_model in trained_models_info:
+                    model_info = trained_models_info[prediction_model]
+                    st.info(f"**{prediction_model}**\n\nAccuracy: {model_info['accuracy']:.3f}\nF1 Score: {model_info['f1_score']:.3f}")
+        
+        with col3:
+            # Option for future enhancement
+            pass
+        
+        # Display current model metrics (only for single model selection)
+        if prediction_model != "🔄 Compare All Models" and prediction_model in trained_models_info:
+            model_info = trained_models_info[prediction_model]
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.metric("Accuracy", f"{model_info['accuracy']:.3f}")
@@ -795,6 +827,8 @@ def display_recommendation_modeling_page(selected_model):
                 st.metric("F1 Score", f"{model_info['f1_score']:.3f}")
             with col3:
                 st.metric("Precision", f"{model_info['precision']:.3f}")
+        elif prediction_model == "🔄 Compare All Models":
+            st.info("💡 **Compare All Models mode**: Get predictions from all available models and see consensus.")
         
         st.markdown("---")
         
@@ -928,32 +962,90 @@ def display_recommendation_modeling_page(selected_model):
                 management_rating, training_rating, office_rating
             )
             
-            # Make prediction using the selected model
-            prediction, confidence = make_prediction_with_model(
-                gaps, company_size, company_type, overtime_policy, selected_model
-            )
-            
-            # Display results
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if prediction == 1:
-                    st.success("✅ **RECOMMENDED**")
-                    st.balloons()
-                    st.markdown("This company performs **above market average** and is recommended!")
-                else:
-                    st.error("❌ **NOT RECOMMENDED**")
-                    st.markdown("This company performs **below market standards**.")
+            if prediction_model == "🔄 Compare All Models":
+                # Compare all models
+                st.markdown("#### 🔄 All Models Comparison")
                 
-                st.metric("Confidence", f"{confidence:.1%}")
+                predictions_data = []
+                all_predictions = []
+                
+                for model_name in prediction_models:
+                    prediction, confidence = make_prediction_with_model(
+                        gaps, company_size, company_type, overtime_policy, 
+                        model_name
+                    )
+                    
+                    all_predictions.append(prediction)
+                    result = "✅ RECOMMEND" if prediction == 1 else "❌ NOT RECOMMEND"
+                    
+                    predictions_data.append({
+                        "Model": model_name,
+                        "Prediction": result,
+                        "Confidence": f"{confidence:.1%}",
+                        "Raw Score": prediction
+                    })
+                
+                # Display comparison table
+                predictions_df = pd.DataFrame(predictions_data)
+                st.dataframe(predictions_df, use_container_width=True)
+                
+                # Calculate consensus
+                consensus_score = sum(all_predictions) / len(all_predictions)
+                consensus_prediction = 1 if consensus_score >= 0.5 else 0
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("#### 🎯 Consensus Result")
+                    if consensus_prediction == 1:
+                        st.success("✅ **CONSENSUS: RECOMMENDED**")
+                        st.markdown(f"**Agreement:** {sum(all_predictions)}/{len(all_predictions)} models recommend")
+                    else:
+                        st.error("❌ **CONSENSUS: NOT RECOMMENDED**")
+                        st.markdown(f"**Agreement:** {len(all_predictions) - sum(all_predictions)}/{len(all_predictions)} models do not recommend")
+                    
+                    st.metric("Consensus Score", f"{consensus_score:.1%}")
+                
+                with col2:
+                    # Create consensus chart
+                    fig_consensus = px.bar(
+                        x=["Recommend", "Not Recommend"],
+                        y=[sum(all_predictions), len(all_predictions) - sum(all_predictions)],
+                        title="Model Consensus",
+                        color=["Recommend", "Not Recommend"],
+                        color_discrete_map={"Recommend": "green", "Not Recommend": "red"}
+                    )
+                    st.plotly_chart(fig_consensus, use_container_width=True)
             
-            with col2:
-                # Create spider chart for this company
-                create_company_spider_chart(
-                    [overall_rating, salary_rating, culture_rating, 
-                     management_rating, training_rating, office_rating],
-                    list(market_averages.values())
+            else:
+                # Single model prediction
+                prediction, confidence = make_prediction_with_model(
+                    gaps, company_size, company_type, overtime_policy, 
+                    prediction_model
                 )
+                
+                # Display results
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if prediction == 1:
+                        st.success("✅ **RECOMMENDED**")
+                        st.balloons()
+                        st.markdown("This company performs **above market average** and is recommended!")
+                    else:
+                        st.error("❌ **NOT RECOMMENDED**")
+                        st.markdown("This company performs **below market standards**.")
+                    
+                    st.metric("Confidence", f"{confidence:.1%}")
+                    st.info(f"**Model Used:** {prediction_model}")
+                
+                with col2:
+                    # Create spider chart for this company
+                    create_company_spider_chart(
+                        [overall_rating, salary_rating, culture_rating, 
+                         management_rating, training_rating, office_rating],
+                        list(market_averages.values())
+                    )
             
             # Show detailed gap analysis
             st.markdown("#### 📈 Detailed Performance Analysis")
@@ -1131,14 +1223,15 @@ def load_actual_trained_model(model_name):
         from sklearn.svm import SVC
         from sklearn.naive_bayes import GaussianNB
         from sklearn.neighbors import KNeighborsClassifier
+        import joblib
         try:
             import lightgbm as lgb
         except ImportError:
-            pass
+            lgb = None
         try:
             import catboost as cb
         except ImportError:
-            pass
+            cb = None
     except ImportError as e:
         st.warning(f"⚠️ Missing required ML libraries: {e}")
         return None
@@ -1187,41 +1280,94 @@ def load_actual_trained_model(model_name):
     model_path = os.path.join(trained_models_dir, model_file)
     
     try:
-        # Fix the pickle loading issue by adding proper module mappings
-        # This handles cases where models were pickled with incorrect module paths
-        
-        # Temporarily add modules to sys.modules to handle pickle loading issues
-        original_modules = {}
-        modules_to_add = {
-            'RandomForestClassifier': RandomForestClassifier,
-            'LogisticRegression': LogisticRegression,
-            'SVC': SVC,
-            'GaussianNB': GaussianNB,
-            'KNeighborsClassifier': KNeighborsClassifier
-        }
-        
-        # Backup and set up modules
-        for module_name, module_class in modules_to_add.items():
-            if module_name in sys.modules:
-                original_modules[module_name] = sys.modules[module_name]
-            # Create a module that contains the class
-            import types
-            fake_module = types.ModuleType(module_name)
-            setattr(fake_module, module_name, module_class)
-            sys.modules[module_name] = fake_module
-        
+        # First, try loading with joblib (preferred for sklearn models)
         try:
-            with open(model_path, 'rb') as f:
-                model = pickle.load(f)
-        finally:
-            # Restore original modules
-            for module_name in modules_to_add:
-                if module_name in original_modules:
-                    sys.modules[module_name] = original_modules[module_name]
+            loaded_data = joblib.load(model_path)
+            
+            # Handle different data structures
+            if hasattr(loaded_data, 'predict'):
+                # Direct model object
+                model = loaded_data
+            elif isinstance(loaded_data, dict):
+                # Dictionary containing model
+                if 'model' in loaded_data:
+                    model = loaded_data['model']
+                    if not hasattr(model, 'predict'):
+                        st.error(f"❌ Object in 'model' key is not a valid model: {type(model)}")
+                        return None
                 else:
-                    sys.modules.pop(module_name, None)
+                    st.error(f"❌ Dictionary doesn't contain 'model' key. Keys: {list(loaded_data.keys())}")
+                    return None
+            else:
+                st.error(f"❌ Unexpected data type loaded: {type(loaded_data)}")
+                return None
+                
+        except Exception as joblib_error:
+            # If joblib fails, try pickle with module fixes
+            st.warning(f"⚠️ Joblib loading failed: {joblib_error}. Trying pickle...")
+            
+            # Temporarily add modules to sys.modules to handle pickle loading issues
+            original_modules = {}
+            modules_to_add = {
+                'RandomForestClassifier': RandomForestClassifier,
+                'LogisticRegression': LogisticRegression,
+                'SVC': SVC,
+                'GaussianNB': GaussianNB,
+                'KNeighborsClassifier': KNeighborsClassifier
+            }
+            
+            # Also add proper sklearn module references
+            sklearn_modules = {
+                'sklearn.ensemble._forest': __import__('sklearn.ensemble', fromlist=['_forest']),
+                'sklearn.linear_model._logistic': __import__('sklearn.linear_model', fromlist=['_logistic']),
+                'sklearn.svm._classes': __import__('sklearn.svm', fromlist=['_classes']),
+                'sklearn.naive_bayes': __import__('sklearn.naive_bayes'),
+                'sklearn.neighbors._classification': __import__('sklearn.neighbors', fromlist=['_classification'])
+            }
+            
+            # Backup and set up modules
+            for module_name, module_class in modules_to_add.items():
+                if module_name in sys.modules:
+                    original_modules[module_name] = sys.modules[module_name]
+                # Create a module that contains the class
+                import types
+                fake_module = types.ModuleType(module_name)
+                setattr(fake_module, module_name, module_class)
+                sys.modules[module_name] = fake_module
+            
+            # Add sklearn modules
+            for module_name, module_obj in sklearn_modules.items():
+                if module_name not in sys.modules:
+                    sys.modules[module_name] = module_obj
+            
+            try:
+                with open(model_path, 'rb') as f:
+                    loaded_data = pickle.load(f)
+                
+                # Handle different data structures
+                if hasattr(loaded_data, 'predict'):
+                    model = loaded_data
+                elif isinstance(loaded_data, dict) and 'model' in loaded_data:
+                    model = loaded_data['model']
+                else:
+                    st.error(f"❌ Could not extract model from loaded data: {type(loaded_data)}")
+                    return None
+                    
+            finally:
+                # Restore original modules
+                for module_name in modules_to_add:
+                    if module_name in original_modules:
+                        sys.modules[module_name] = original_modules[module_name]
+                    else:
+                        sys.modules.pop(module_name, None)
         
-        st.success(f"✅ Loaded trained model: {model_file}")
+        # Validate the model has the required methods
+        if not hasattr(model, 'predict'):
+            st.error(f"❌ Loaded object is not a valid model - missing 'predict' method: {type(model)}")
+            return None
+        
+        st.success(f"✅ Successfully loaded trained model: {model_file}")
+        st.info(f"📊 Model type: {type(model).__name__}")
         return model
         
     except Exception as e:
@@ -1231,25 +1377,49 @@ def load_actual_trained_model(model_name):
 
 
 def create_feature_vector(gaps, company_size, company_type, overtime_policy):
-    """Create feature vector for model prediction"""
+    """Create feature vector for model prediction matching the training format"""
+    # The models were trained with these 11 features in this exact order:
+    # ['rating_gap', 'salary_and_benefits_gap', 'training_and_learning_gap', 
+    #  'culture_and_fun_gap', 'office_and_workspace_gap', 'management_cares_about_me_gap',
+    #  'rating_cluster', 'size_cluster', 'Company size', 'Company Type', 'Overtime Policy']
+    
     # Convert categorical variables to numerical (simple encoding)
     size_mapping = {"1-50": 0, "51-100": 1, "101-500": 2, "501-1000": 3, "1000+": 4}
     type_mapping = {"Product": 0, "Outsourcing": 1, "Service": 2, "Startup": 3}
     ot_mapping = {"No OT": 0, "Extra Salary": 1, "Flexible": 2, "Comp Time": 3}
     
-    # Create feature vector based on the order used in training
-    # [rating_gap, salary_gap, culture_gap, management_gap, training_gap, office_gap, 
-    #  company_size, company_type, overtime_policy]
+    # Calculate cluster values (simplified approximation)
+    # rating_cluster based on overall gap
+    overall_gap = gaps.get("Overall Gap", 0)
+    if overall_gap > 0.3:
+        rating_cluster = 2  # High rating cluster
+    elif overall_gap > -0.2:
+        rating_cluster = 1  # Medium rating cluster  
+    else:
+        rating_cluster = 0  # Low rating cluster
+    
+    # size_cluster based on company size
+    company_size_num = size_mapping.get(company_size, 2)
+    if company_size_num <= 1:
+        size_cluster = 0  # Small
+    elif company_size_num <= 3:
+        size_cluster = 1  # Medium
+    else:
+        size_cluster = 2  # Large
+    
+    # Create feature vector with exact names and order expected by the model
     feature_vector = [
-        gaps["Overall Gap"],
-        gaps["Salary Gap"], 
-        gaps["Culture Gap"],
-        gaps["Management Gap"],
-        gaps["Training Gap"],
-        gaps["Office Gap"],
-        size_mapping.get(company_size, 2),  # Default to medium size
-        type_mapping.get(company_type, 0),   # Default to Product
-        ot_mapping.get(overtime_policy, 0)   # Default to No OT
+        gaps.get("Overall Gap", 0),                    # rating_gap
+        gaps.get("Salary Gap", 0),                     # salary_and_benefits_gap
+        gaps.get("Training Gap", 0),                   # training_and_learning_gap
+        gaps.get("Culture Gap", 0),                    # culture_and_fun_gap
+        gaps.get("Office Gap", 0),                     # office_and_workspace_gap
+        gaps.get("Management Gap", 0),                 # management_cares_about_me_gap
+        rating_cluster,                                # rating_cluster
+        size_cluster,                                  # size_cluster
+        size_mapping.get(company_size, 2),             # Company size
+        type_mapping.get(company_type, 0),             # Company Type
+        ot_mapping.get(overtime_policy, 0)             # Overtime Policy
     ]
     
     return np.array(feature_vector).reshape(1, -1)
@@ -1265,17 +1435,36 @@ def make_prediction_with_model(gaps, company_size, company_type, overtime_policy
         try:
             feature_vector = create_feature_vector(gaps, company_size, company_type, overtime_policy)
             
-            # Make prediction
-            prediction = model.predict(feature_vector)[0]
-            
-            # Get prediction probability if available
-            if hasattr(model, 'predict_proba'):
-                proba = model.predict_proba(feature_vector)[0]
-                confidence = max(proba)  # Confidence is the max probability
+            # For CatBoost, we need to provide a DataFrame with feature names
+            if hasattr(model, '__class__') and 'catboost' in str(type(model)).lower():
+                # CatBoost expects feature names
+                feature_names = ['rating_gap', 'salary_and_benefits_gap', 'training_and_learning_gap', 
+                               'culture_and_fun_gap', 'office_and_workspace_gap', 'management_cares_about_me_gap',
+                               'rating_cluster', 'size_cluster', 'Company size', 'Company Type', 'Overtime Policy']
+                
+                # Create DataFrame for CatBoost
+                import pandas as pd
+                feature_df = pd.DataFrame(feature_vector, columns=feature_names)
+                prediction = model.predict(feature_df)[0]
+                
+                # Get prediction probability if available
+                if hasattr(model, 'predict_proba'):
+                    proba = model.predict_proba(feature_df)[0]
+                    confidence = max(proba)
+                else:
+                    confidence = 0.8  # Default confidence for CatBoost
             else:
-                # For models without predict_proba, use simple confidence calculation
-                gap_score = sum(gaps.values()) / len(gaps)
-                confidence = min(0.95, max(0.55, 0.75 + abs(gap_score) * 0.3))
+                # Regular sklearn models
+                prediction = model.predict(feature_vector)[0]
+                
+                # Get prediction probability if available
+                if hasattr(model, 'predict_proba'):
+                    proba = model.predict_proba(feature_vector)[0]
+                    confidence = max(proba)  # Confidence is the max probability
+                else:
+                    # For models without predict_proba, use simple confidence calculation
+                    gap_score = sum(gaps.values()) / len(gaps)
+                    confidence = min(0.95, max(0.55, 0.75 + abs(gap_score) * 0.3))
             
             return int(prediction), confidence
             
