@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
+import joblib  # Add joblib import
 import os
 import warnings
 import matplotlib.pyplot as plt
@@ -1211,168 +1212,53 @@ def make_prediction(gaps, company_size, company_type, overtime_policy, model_nam
 
 
 def load_actual_trained_model(model_name):
-    """Load actual trained model from trained_models directory"""
-    import os
-    import pickle
-    import sys
-    
-    # Import all necessary ML libraries first
+    """Load trained model with comprehensive error handling and fallback"""
     try:
-        from sklearn.ensemble import RandomForestClassifier
-        from sklearn.linear_model import LogisticRegression
-        from sklearn.svm import SVC
-        from sklearn.naive_bayes import GaussianNB
-        from sklearn.neighbors import KNeighborsClassifier
-        import joblib
-        try:
-            import lightgbm as lgb
-        except ImportError:
-            lgb = None
-        try:
-            import catboost as cb
-        except ImportError:
-            cb = None
-    except ImportError as e:
-        st.warning(f"⚠️ Missing required ML libraries: {e}")
-        return None
-    
-    # Enhanced mapping for all model names and patterns
-    model_patterns = {
-        "Random Forest": ["Random Forest", "Random_Forest", "RandomForest", "RF"],
-        "Logistic Regression": ["Logistic Regression", "Logistic_Regression", "LogisticRegression"], 
-        "LightGBM": ["LightGBM", "lightgbm"],
-        "CatBoost": ["CatBoost", "catboost"],
-        "SVM": ["SVM", "svm"],
-        "KNN": ["KNN", "knn"],
-        "Naive Bayes": ["Naive_Bayes", "NaiveBayes", "naive_bayes"],
-        "Neural Network": ["Neural_Network", "NeuralNetwork", "neural_network"]
-    }
-    
-    trained_models_dir = "trained_models"
-    
-    if not os.path.exists(trained_models_dir):
-        st.warning(f"⚠️ Trained models directory '{trained_models_dir}' not found. Using simulation.")
-        return None
-    
-    # Get all possible patterns for this model
-    patterns = model_patterns.get(model_name, [model_name])
-    
-    # Find matching files
-    possible_files = []
-    for file in os.listdir(trained_models_dir):
-        if file.endswith('.pkl'):
-            for pattern in patterns:
-                if pattern.lower() in file.lower():
-                    possible_files.append(file)
-                    break
-    
-    if not possible_files:
-        st.warning(f"⚠️ No trained model file found for {model_name}. Using simulation.")
-        return None
-    
-    # Prefer files without timestamps (base models), then most recent
-    base_files = [f for f in possible_files if not any(char.isdigit() for char in f.split('.')[0][-8:])]
-    if base_files:
-        model_file = base_files[0]
-    else:
-        model_file = sorted(possible_files)[-1]
-    
-    model_path = os.path.join(trained_models_dir, model_file)
-    
-    try:
-        # First, try loading with joblib (preferred for sklearn models)
-        try:
-            loaded_data = joblib.load(model_path)
-            
-            # Handle different data structures
-            if hasattr(loaded_data, 'predict'):
-                # Direct model object
-                model = loaded_data
-            elif isinstance(loaded_data, dict):
-                # Dictionary containing model
-                if 'model' in loaded_data:
-                    model = loaded_data['model']
-                    if not hasattr(model, 'predict'):
-                        st.error(f"❌ Object in 'model' key is not a valid model: {type(model)}")
-                        return None
-                else:
-                    st.error(f"❌ Dictionary doesn't contain 'model' key. Keys: {list(loaded_data.keys())}")
-                    return None
-            else:
-                st.error(f"❌ Unexpected data type loaded: {type(loaded_data)}")
-                return None
-                
-        except Exception as joblib_error:
-            # If joblib fails, try pickle with module fixes
-            st.warning(f"⚠️ Joblib loading failed: {joblib_error}. Trying pickle...")
-            
-            # Temporarily add modules to sys.modules to handle pickle loading issues
-            original_modules = {}
-            modules_to_add = {
-                'RandomForestClassifier': RandomForestClassifier,
-                'LogisticRegression': LogisticRegression,
-                'SVC': SVC,
-                'GaussianNB': GaussianNB,
-                'KNeighborsClassifier': KNeighborsClassifier
-            }
-            
-            # Also add proper sklearn module references
-            sklearn_modules = {
-                'sklearn.ensemble._forest': __import__('sklearn.ensemble', fromlist=['_forest']),
-                'sklearn.linear_model._logistic': __import__('sklearn.linear_model', fromlist=['_logistic']),
-                'sklearn.svm._classes': __import__('sklearn.svm', fromlist=['_classes']),
-                'sklearn.naive_bayes': __import__('sklearn.naive_bayes'),
-                'sklearn.neighbors._classification': __import__('sklearn.neighbors', fromlist=['_classification'])
-            }
-            
-            # Backup and set up modules
-            for module_name, module_class in modules_to_add.items():
-                if module_name in sys.modules:
-                    original_modules[module_name] = sys.modules[module_name]
-                # Create a module that contains the class
-                import types
-                fake_module = types.ModuleType(module_name)
-                setattr(fake_module, module_name, module_class)
-                sys.modules[module_name] = fake_module
-            
-            # Add sklearn modules
-            for module_name, module_obj in sklearn_modules.items():
-                if module_name not in sys.modules:
-                    sys.modules[module_name] = module_obj
-            
-            try:
-                with open(model_path, 'rb') as f:
-                    loaded_data = pickle.load(f)
-                
-                # Handle different data structures
-                if hasattr(loaded_data, 'predict'):
-                    model = loaded_data
-                elif isinstance(loaded_data, dict) and 'model' in loaded_data:
-                    model = loaded_data['model']
-                else:
-                    st.error(f"❌ Could not extract model from loaded data: {type(loaded_data)}")
-                    return None
-                    
-            finally:
-                # Restore original modules
-                for module_name in modules_to_add:
-                    if module_name in original_modules:
-                        sys.modules[module_name] = original_modules[module_name]
-                    else:
-                        sys.modules.pop(module_name, None)
+        models_dir = "trained_models"
+        model_path = os.path.join(models_dir, f"{model_name}.pkl")
         
-        # Validate the model has the required methods
-        if not hasattr(model, 'predict'):
-            st.error(f"❌ Loaded object is not a valid model - missing 'predict' method: {type(model)}")
+        if not os.path.exists(model_path):
+            st.warning(f"⚠️ Model file not found: {model_path}")
             return None
         
-        st.success(f"✅ Successfully loaded trained model: {model_file}")
-        st.info(f"📊 Model type: {type(model).__name__}")
-        return model
-        
+        # Try to load with joblib first
+        try:
+            st.info(f"🔄 Loading model {model_name}...")
+            model_data = joblib.load(model_path)
+            
+            # Check if it's the new format with metadata
+            if isinstance(model_data, dict) and 'model' in model_data:
+                st.success(f"✅ Successfully loaded {model_name} (new format)")
+                return model_data
+            else:
+                # Old format - just the model object
+                st.warning(f"⚠️ Loaded {model_name} in old format")
+                return {'model': model_data, 'model_name': model_name}
+                
+        except Exception as load_error:
+            error_msg = str(load_error)
+            st.warning(f"⚠️ Joblib loading failed: {error_msg}")
+            
+            # Check for specific sklearn version incompatibility
+            if "dtype" in error_msg or "incompatible" in error_msg:
+                st.error(f"❌ Model {model_name} has version incompatibility.")
+                st.info("💡 Solution: The models need to be retrained with current scikit-learn version.")
+                st.info("💡 For now, using fallback simulation logic.")
+                return None
+            
+            # Try pickle as fallback for other errors
+            try:
+                import pickle
+                with open(model_path, 'rb') as f:
+                    model_data = pickle.load(f)
+                st.warning(f"⚠️ Loaded {model_name} using pickle fallback")
+                return {'model': model_data, 'model_name': model_name}
+            except Exception as pickle_error:
+                st.error(f"❌ Error loading model {model_name}: {str(pickle_error)}")
+                return None
+                
     except Exception as e:
-        st.error(f"❌ Error loading model {model_file}: {e}")
-        st.info("🔄 Falling back to simulation mode.")
+        st.error(f"❌ Unexpected error loading {model_name}: {str(e)}")
         return None
 
 
@@ -1428,9 +1314,15 @@ def create_feature_vector(gaps, company_size, company_type, overtime_policy):
 def make_prediction_with_model(gaps, company_size, company_type, overtime_policy, model_name):
     """Make prediction using actual trained model or simulation"""
     # Try to load actual model
-    model = load_actual_trained_model(model_name)
+    model_data = load_actual_trained_model(model_name)
     
-    if model is not None:
+    if model_data is not None:
+        # Extract the actual model object
+        if isinstance(model_data, dict) and 'model' in model_data:
+            model = model_data['model']
+        else:
+            model = model_data
+            
         # Use actual trained model
         try:
             feature_vector = create_feature_vector(gaps, company_size, company_type, overtime_policy)
@@ -1444,7 +1336,7 @@ def make_prediction_with_model(gaps, company_size, company_type, overtime_policy
                 
                 # Create DataFrame for CatBoost
                 import pandas as pd
-                feature_df = pd.DataFrame(feature_vector, columns=feature_names)
+                feature_df = pd.DataFrame([feature_vector], columns=feature_names)
                 prediction = model.predict(feature_df)[0]
                 
                 # Get prediction probability if available
@@ -1455,11 +1347,12 @@ def make_prediction_with_model(gaps, company_size, company_type, overtime_policy
                     confidence = 0.8  # Default confidence for CatBoost
             else:
                 # Regular sklearn models
-                prediction = model.predict(feature_vector)[0]
+                feature_vector_reshaped = np.array([feature_vector]).reshape(1, -1)
+                prediction = model.predict(feature_vector_reshaped)[0]
                 
                 # Get prediction probability if available
                 if hasattr(model, 'predict_proba'):
-                    proba = model.predict_proba(feature_vector)[0]
+                    proba = model.predict_proba(feature_vector_reshaped)[0]
                     confidence = max(proba)  # Confidence is the max probability
                 else:
                     # For models without predict_proba, use simple confidence calculation
