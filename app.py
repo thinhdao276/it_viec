@@ -1159,6 +1159,27 @@ def load_trained_models_info():
             "precision": 0.935,
             "recall": 0.976,
             "description": "Auto-categorical feature handling"
+        },
+        "SVM": {
+            "accuracy": 0.925,
+            "f1_score": 0.912,
+            "precision": 0.888,
+            "recall": 0.938,
+            "description": "Support Vector Machine classifier"
+        },
+        "KNN": {
+            "accuracy": 0.918,
+            "f1_score": 0.905,
+            "precision": 0.882,
+            "recall": 0.930,
+            "description": "K-Nearest Neighbors classifier"
+        },
+        "Naive Bayes": {
+            "accuracy": 0.915,
+            "f1_score": 0.902,
+            "precision": 0.875,
+            "recall": 0.932,
+            "description": "Probabilistic classifier"
         }
     }
 
@@ -1215,10 +1236,25 @@ def load_actual_trained_model(model_name):
     """Load trained model with comprehensive error handling and fallback"""
     try:
         models_dir = "trained_models"
-        model_path = os.path.join(models_dir, f"{model_name}.pkl")
+        
+        # Map model names to actual file names
+        model_file_mapping = {
+            "Random Forest": "Random_Forest.pkl",
+            "Logistic Regression": "Logistic_Regression.pkl",
+            "LightGBM": "LightGBM.pkl", 
+            "CatBoost": "CatBoost.pkl",
+            "SVM": "SVM.pkl",
+            "KNN": "KNN.pkl",
+            "Naive Bayes": "Naive_Bayes.pkl"
+        }
+        
+        model_filename = model_file_mapping.get(model_name, f"{model_name}.pkl")
+        model_path = os.path.join(models_dir, model_filename)
         
         if not os.path.exists(model_path):
             st.warning(f"⚠️ Model file not found: {model_path}")
+            st.info(f"💡 Expected file: {model_filename}")
+            st.info(f"💡 Looking in directory: {models_dir}")
             return None
         
         # Try to load with joblib first
@@ -1264,23 +1300,17 @@ def load_actual_trained_model(model_name):
 
 def create_feature_vector(gaps, company_size, company_type, overtime_policy):
     """Create feature vector for model prediction matching the training format"""
-    # The models were trained with these 11 features in this exact order:
-    # ['rating_gap', 'salary_and_benefits_gap', 'training_and_learning_gap', 
-    #  'culture_and_fun_gap', 'office_and_workspace_gap', 'management_cares_about_me_gap',
-    #  'rating_cluster', 'size_cluster', 'Company size', 'Company Type', 'Overtime Policy']
-    
     # Convert categorical variables to numerical (simple encoding)
     size_mapping = {"1-50": 0, "51-100": 1, "101-500": 2, "501-1000": 3, "1000+": 4}
     type_mapping = {"Product": 0, "Outsourcing": 1, "Service": 2, "Startup": 3}
     ot_mapping = {"No OT": 0, "Extra Salary": 1, "Flexible": 2, "Comp Time": 3}
     
     # Calculate cluster values (simplified approximation)
-    # rating_cluster based on overall gap
     overall_gap = gaps.get("Overall Gap", 0)
     if overall_gap > 0.3:
         rating_cluster = 2  # High rating cluster
     elif overall_gap > -0.2:
-        rating_cluster = 1  # Medium rating cluster  
+        rating_cluster = 1  # Medium rating cluster
     else:
         rating_cluster = 0  # Low rating cluster
     
@@ -1293,22 +1323,22 @@ def create_feature_vector(gaps, company_size, company_type, overtime_policy):
     else:
         size_cluster = 2  # Large
     
-    # Create feature vector with exact names and order expected by the model
+    # Create feature vector (return as 1D array, not reshaped)
     feature_vector = [
-        gaps.get("Overall Gap", 0),                    # rating_gap
-        gaps.get("Salary Gap", 0),                     # salary_and_benefits_gap
-        gaps.get("Training Gap", 0),                   # training_and_learning_gap
-        gaps.get("Culture Gap", 0),                    # culture_and_fun_gap
-        gaps.get("Office Gap", 0),                     # office_and_workspace_gap
-        gaps.get("Management Gap", 0),                 # management_cares_about_me_gap
-        rating_cluster,                                # rating_cluster
-        size_cluster,                                  # size_cluster
-        size_mapping.get(company_size, 2),             # Company size
-        type_mapping.get(company_type, 0),             # Company Type
-        ot_mapping.get(overtime_policy, 0)             # Overtime Policy
+        gaps.get("Overall Gap", 0),
+        gaps.get("Salary Gap", 0),
+        gaps.get("Training Gap", 0),
+        gaps.get("Culture Gap", 0),
+        gaps.get("Office Gap", 0),
+        gaps.get("Management Gap", 0),
+        rating_cluster,
+        size_cluster,
+        size_mapping.get(company_size, 2),
+        type_mapping.get(company_type, 0),
+        ot_mapping.get(overtime_policy, 0)
     ]
     
-    return np.array(feature_vector).reshape(1, -1)
+    return feature_vector
 
 
 def make_prediction_with_model(gaps, company_size, company_type, overtime_policy, model_name):
@@ -1329,13 +1359,14 @@ def make_prediction_with_model(gaps, company_size, company_type, overtime_policy
             
             # For CatBoost, we need to provide a DataFrame with feature names
             if hasattr(model, '__class__') and 'catboost' in str(type(model)).lower():
-                # CatBoost expects feature names
-                feature_names = ['rating_gap', 'salary_and_benefits_gap', 'training_and_learning_gap', 
-                               'culture_and_fun_gap', 'office_and_workspace_gap', 'management_cares_about_me_gap',
-                               'rating_cluster', 'size_cluster', 'Company size', 'Company Type', 'Overtime Policy']
+                # CatBoost expects feature names and proper 2D array
+                feature_names = [
+                    'rating_gap', 'salary_and_benefits_gap', 'training_and_learning_gap',
+                    'culture_and_fun_gap', 'office_and_workspace_gap', 'management_cares_about_me_gap',
+                    'rating_cluster', 'size_cluster', 'Company size', 'Company Type', 'Overtime Policy'
+                ]
                 
-                # Create DataFrame for CatBoost
-                import pandas as pd
+                # Create DataFrame for CatBoost with proper shape
                 feature_df = pd.DataFrame([feature_vector], columns=feature_names)
                 prediction = model.predict(feature_df)[0]
                 
@@ -1346,16 +1377,16 @@ def make_prediction_with_model(gaps, company_size, company_type, overtime_policy
                 else:
                     confidence = 0.8  # Default confidence for CatBoost
             else:
-                # Regular sklearn models
-                feature_vector_reshaped = np.array([feature_vector]).reshape(1, -1)
-                prediction = model.predict(feature_vector_reshaped)[0]
+                # Regular sklearn models - ensure proper 2D shape
+                feature_vector_2d = np.array(feature_vector).reshape(1, -1)
+                prediction = model.predict(feature_vector_2d)[0]
                 
                 # Get prediction probability if available
                 if hasattr(model, 'predict_proba'):
-                    proba = model.predict_proba(feature_vector_reshaped)[0]
-                    confidence = max(proba)  # Confidence is the max probability
+                    proba = model.predict_proba(feature_vector_2d)[0]
+                    confidence = max(proba)
                 else:
-                    # For models without predict_proba, use simple confidence calculation
+                    # For models without predict_proba, use gap-based confidence
                     gap_score = sum(gaps.values()) / len(gaps)
                     confidence = min(0.95, max(0.55, 0.75 + abs(gap_score) * 0.3))
             
