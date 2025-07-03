@@ -48,6 +48,9 @@ try:
     )
     UTILS_AVAILABLE = True
     
+    # Store the original function before replacing it
+    original_load_and_preprocess_data = load_and_preprocess_data
+    
     # Override the load_and_preprocess_data function to add caching
     def load_and_preprocess_data_cached(file_path):
         """Load and preprocess data with caching"""
@@ -66,8 +69,8 @@ try:
                     df_relevant_cols = pd.read_csv(preprocessed_file)
                     return df_relevant_cols
             
-            # If preprocessed file doesn't exist or is outdated, create it
-            df_relevant_cols = load_and_preprocess_data(file_path)
+            # If preprocessed file doesn't exist or is outdated, create it using original function
+            df_relevant_cols = original_load_and_preprocess_data(file_path)
             if df_relevant_cols is not None:
                 # Save preprocessed data for future use
                 df_relevant_cols.to_csv(preprocessed_file, index=False)
@@ -367,6 +370,7 @@ if not UTILS_AVAILABLE:
 def load_data():
     """Load and preprocess the company data with caching"""
     file_paths = [
+        "data/Overview_Companies.xlsx",
         "Du lieu cung cap/Overview_Companies.xlsx",
         "Overview_Companies.xlsx"
     ]
@@ -2000,6 +2004,7 @@ def load_company_data_for_picker():
         else:
             # Load from Excel if CSV doesn't exist
             file_paths = [
+                "data/Overview_Companies.xlsx",
                 "Du lieu cung cap/Overview_Companies.xlsx",
                 "Overview_Companies.xlsx"
             ]
