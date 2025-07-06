@@ -1,0 +1,37 @@
+{
+  "Logistic Regression": {
+    "model_path": "trained_models/Logistic_Regression.pkl",
+    "model_name": "Logistic Regression",
+    "file_size": 976
+  },
+  "Random Forest": {
+    "model_path": "trained_models/Random_Forest.pkl",
+    "model_name": "Random Forest",
+    "file_size": 1226026
+  },
+  "SVM": {
+    "model_path": "trained_models/SVM.pkl",
+    "model_name": "SVM",
+    "file_size": 45084
+  },
+  "Naive Bayes": {
+    "model_path": "trained_models/Naive_Bayes.pkl",
+    "model_name": "Naive Bayes",
+    "file_size": 1144
+  },
+  "KNN": {
+    "model_path": "trained_models/KNN.pkl",
+    "model_name": "KNN",
+    "file_size": 1346311
+  },
+  "LightGBM": {
+    "model_path": "trained_models/LightGBM.pkl",
+    "model_name": "LightGBM",
+    "file_size": 106309
+  },
+  "CatBoost": {
+    "model_path": "trained_models/CatBoost.pkl",
+    "model_name": "CatBoost",
+    "file_size": 1072561
+  }
+}
