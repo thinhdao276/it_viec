@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Report: Company Recommendation System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Neutral Harmony -->
+    <!-- Application Structure Plan: A single-page narrative structure is used to guide the user logically from the high-level concept to the underlying details and finally to an interactive simulation. The flow is: 1) Hero section to define the problem and solution (Rating Gap Analysis). 2) Methodology section using a visual flow diagram to explain the process. 3) An interactive "Explore the Gaps" section to let users visualize the core features. 4) A "Model Performance" section with charts to build trust in the results. 5) A final "Interactive Profiler" to allow hands-on exploration. This structure was chosen over a dashboard to tell a story, making the complex data science concepts more accessible and engaging for a general audience. -->
+    <!-- Visualization & Content Choices: 
+        - Methodology Diagram: Goal: Organize. Method: HTML/CSS diagram instead of a static image for better responsiveness and clarity. Interaction: None, purely informational. Justification: Clearly illustrates the data pipeline.
+        - Rating Gaps Chart: Goal: Compare/Explore. Viz: Bar Chart (Chart.js). Interaction: Buttons to switch between different 'gap' feature distributions. Justification: Allows users to actively explore the key predictive features, making the abstract concept of 'gaps' tangible.
+        - Model Performance Chart: Goal: Compare. Viz: Bar Chart (Chart.js). Interaction: None. Justification: A simple bar chart is the most direct way to compare the performance of the two models.
+        - Feature Importance Chart: Goal: Explain. Viz: Horizontal Bar Chart (Chart.js). Interaction: None. Justification: Clearly ranks the most influential factors for the model's predictions.
+        - Company Profiler: Goal: Relate/Engage. Viz: Radar Chart (Chart.js) + HTML Sliders. Interaction: User-controlled sliders update the radar chart and recommendation in real-time. Justification: This is the 'wow' factor, turning the passive report into an active tool and cementing the user's understanding of how different factors influence the final recommendation.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .chart-container { position: relative; width: 100%; max-width: 600px; margin-left: auto; margin-right: auto; height: 350px; max-height: 45vh; }
+        @media (max-width: 768px) {
+            .chart-container { height: 300px; max-height: 50vh; }
+        }
+        .slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #4f46e5;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .slider-track {
+            width: 100%;
+            height: 8px;
+            cursor: pointer;
+            background: #e5e7eb;
+            border-radius: 9999px;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <main class="container mx-auto px-4 py-8 md:py-16">
+
+        <!-- Section 1: Hero -->
+        <section class="text-center mb-16 md:mb-24">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-slate-900 mb-4">Find Objectively Better Companies</h1>
+            <p class="max-w-3xl mx-auto text-lg md:text-xl text-slate-600">
+                This report introduces a system that moves beyond "similar" company recommendations. We use **Rating Gap Analysis** to identify companies that perform significantly better than the market average across key areas like salary, culture, and management.
+            </p>
+        </section>
+
+        <!-- Section 2: Methodology -->
+        <section id="methodology" class="mb-16 md:mb-24">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-slate-900">Our Recommendation Engine</h2>
+                <p class="text-lg text-slate-600 mt-2">We combine multiple data sources into a powerful predictive model.</p>
+            </div>
+            <div class="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 text-center">
+                <div class="bg-white p-6 rounded-xl shadow-md w-full md:w-1/4">
+                    <div class="text-3xl mb-2">📊</div>
+                    <h3 class="font-bold text-lg">Data Inputs</h3>
+                    <p class="text-sm text-slate-500">Reviews, Ratings & Company Metadata</p>
+                </div>
+                <div class="text-4xl font-thin text-slate-400 transform md:rotate-0 rotate-90">&rarr;</div>
+                <div class="bg-white p-6 rounded-xl shadow-md w-full md:w-1/4">
+                    <div class="text-3xl mb-2">⚙️</div>
+                    <h3 class="font-bold text-lg">Feature Engineering</h3>
+                    <p class="text-sm text-slate-500">Calculating the critical "Rating Gaps"</p>
+                </div>
+                <div class="text-4xl font-thin text-slate-400 transform md:rotate-0 rotate-90">&rarr;</div>
+                <div class="bg-indigo-600 text-white p-6 rounded-xl shadow-lg w-full md:w-1/4">
+                    <div class="text-3xl mb-2">💡</div>
+                    <h3 class="font-bold text-lg">ML Model</h3>
+                    <p class="text-sm text-indigo-200">Predicting a recommendation score</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: Explore the Gaps -->
+        <section id="explore" class="mb-16 md:mb-24 bg-white p-6 md:p-10 rounded-2xl shadow-lg">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div>
+                    <h2 class="text-3xl font-bold text-slate-900">What are "Rating Gaps"?</h2>
+                    <p class="text-lg text-slate-600 mt-2 mb-6">
+                        A "gap" is the difference between a company's specific rating and the average rating for all companies. A positive gap means the company is better than average in that area. This is the core of our model.
+                    </p>
+                    <div id="gap-buttons" class="flex flex-wrap gap-2 mb-4">
+                        <button class="gap-btn active bg-indigo-600 text-white py-2 px-4 rounded-full text-sm font-semibold" data-feature="rating_gap">Overall Rating</button>
+                        <button class="gap-btn bg-slate-200 text-slate-700 py-2 px-4 rounded-full text-sm font-semibold" data-feature="salary_benefits_gap">Salary & Benefits</button>
+                        <button class="gap-btn bg-slate-200 text-slate-700 py-2 px-4 rounded-full text-sm font-semibold" data-feature="training_learning_gap">Training & Learning</button>
+                    </div>
+                    <div id="gap-description" class="bg-slate-100 p-4 rounded-lg min-h-[80px]">
+                        <p class="text-slate-700 text-sm"></p>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="gapChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 4: Model Performance -->
+        <section id="performance" class="mb-16 md:mb-24">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-slate-900">Proven Performance & Key Drivers</h2>
+                <p class="text-lg text-slate-600 mt-2">Our model is highly accurate, driven by the rating gap features.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+                <div class="bg-white p-6 rounded-2xl shadow-lg">
+                    <h3 class="font-bold text-xl text-center mb-4">Model Accuracy Comparison</h3>
+                    <div class="chart-container" style="height:300px;">
+                        <canvas id="modelPerfChart"></canvas>
+                    </div>
+                    <p class="text-sm text-slate-500 mt-4 text-center">The Random Forest model significantly outperforms the baseline, achieving near-perfect accuracy on the test data.</p>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-lg">
+                    <h3 class="font-bold text-xl text-center mb-4">Most Important Features</h3>
+                    <div class="chart-container" style="height:300px;">
+                        <canvas id="featureImportanceChart"></canvas>
+                    </div>
+                    <p class="text-sm text-slate-500 mt-4 text-center">The model's decisions are primarily driven by the overall `rating_gap` and specific gaps like salary and management.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 5: Interactive Profiler -->
+        <section id="profiler" class="bg-indigo-700 text-white p-6 md:p-10 rounded-2xl shadow-2xl">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold">Interactive Company Profiler</h2>
+                <p class="text-lg text-indigo-200 mt-2">Adjust a company's performance gaps to see how it affects the recommendation.</p>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-center">
+                <div id="profiler-sliders">
+                    <!-- Sliders will be generated here by JS -->
+                </div>
+                <div>
+                    <div class="chart-container bg-white/10 rounded-xl p-4">
+                        <canvas id="profilerChart"></canvas>
+                    </div>
+                    <div id="profiler-recommendation" class="mt-6 text-center bg-white text-slate-900 p-4 rounded-xl shadow-lg">
+                        <span class="font-bold text-2xl">Recommendation: <span id="recommendation-text" class="text-indigo-600">Recommend</span></span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    const chartColors = {
+        primary: 'rgba(79, 70, 229, 0.8)',
+        primaryBg: 'rgba(79, 70, 229, 0.2)',
+        neutral: 'rgba(100, 116, 139, 0.8)',
+        neutralBg: 'rgba(100, 116, 139, 0.2)',
+        white: 'rgba(255, 255, 255, 0.8)',
+        whiteBg: 'rgba(255, 255, 255, 0.2)',
+    };
+    
+    const tooltipConfig = {
+        backgroundColor: '#1e293b',
+        titleFont: { size: 14, weight: 'bold' },
+        bodyFont: { size: 12 },
+        padding: 10,
+        cornerRadius: 4,
+        displayColors: false,
+    };
+
+    const gridConfig = (color = 'rgba(203, 213, 225, 0.5)') => ({
+        color: color,
+        drawBorder: false,
+    });
+    
+    const ticksConfig = (color = '#64748b') => ({
+        color: color,
+        font: { size: 12 },
+    });
+    
+    function wrapLabels(label, maxWidth) {
+        const words = label.split(' ');
+        const lines = [];
+        let currentLine = '';
+        words.forEach(word => {
+            if ((currentLine + ' ' + word).length > maxWidth) {
+                lines.push(currentLine);
+                currentLine = word;
+            } else {
+                currentLine += (currentLine === '' ? '' : ' ') + word;
+            }
+        });
+        lines.push(currentLine);
+        return lines;
+    }
+
+    // --- Section 3: Gap Chart ---
+    const gapData = {
+        rating_gap: {
+            labels: ['Below Average', 'Average', 'Above Average'],
+            values: [25, 45, 30],
+            description: 'The overall rating_gap is the single most powerful predictor. A positive value strongly suggests a company is a good place to work.'
+        },
+        salary_benefits_gap: {
+            labels: ['Below Average', 'Average', 'Above Average'],
+            values: [35, 40, 25],
+            description: 'Salary and benefits gaps show how compensation compares to the market. This is a critical factor for many employees.'
+        },
+        training_learning_gap: {
+            labels: ['Below Average', 'Average', 'Above Average'],
+            values: [20, 50, 30],
+            description: 'Opportunities for training and learning are key for career growth. Companies excelling here are highly valued.'
+        },
+    };
+
+    const gapChartCtx = document.getElementById('gapChart').getContext('2d');
+    let gapChart = new Chart(gapChartCtx, {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Company Distribution (%)',
+                data: [],
+                backgroundColor: chartColors.primaryBg,
+                borderColor: chartColors.primary,
+                borderWidth: 2,
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: tooltipConfig
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: gridConfig(),
+                    ticks: ticksConfig(),
+                    title: { display: true, text: '% of Companies', color: '#475569' }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: ticksConfig()
+                }
+            }
+        }
+    });
+
+    const gapButtons = document.querySelectorAll('.gap-btn');
+    const gapDescriptionEl = document.querySelector('#gap-description p');
+
+    function updateGapChart(feature) {
+        const data = gapData[feature];
+        gapChart.data.labels = data.labels;
+        gapChart.data.datasets[0].data = data.values;
+        gapChart.update();
+        gapDescriptionEl.textContent = data.description;
+
+        gapButtons.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.feature === feature);
+            btn.classList.toggle('bg-indigo-600', btn.dataset.feature === feature);
+            btn.classList.toggle('text-white', btn.dataset.feature === feature);
+            btn.classList.toggle('bg-slate-200', btn.dataset.feature !== feature);
+            btn.classList.toggle('text-slate-700', btn.dataset.feature !== feature);
+        });
+    }
+
+    gapButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            updateGapChart(button.dataset.feature);
+        });
+    });
+    updateGapChart('rating_gap');
+
+    // --- Section 4: Performance Charts ---
+    const modelPerfCtx = document.getElementById('modelPerfChart').getContext('2d');
+    new Chart(modelPerfCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Rating Gap Baseline', 'Random Forest Model'],
+            datasets: [{
+                label: 'F1-Score',
+                data: [0.952, 1.00],
+                backgroundColor: [chartColors.neutralBg, chartColors.primaryBg],
+                borderColor: [chartColors.neutral, chartColors.primary],
+                borderWidth: 2,
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: { legend: { display: false }, tooltip: tooltipConfig },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    grid: gridConfig(),
+                    ticks: ticksConfig(),
+                    max: 1.0
+                },
+                y: { grid: { display: false }, ticks: ticksConfig() }
+            }
+        }
+    });
+
+    const featureImportanceCtx = document.getElementById('featureImportanceChart').getContext('2d');
+    new Chart(featureImportanceCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Rating Gap', 'Mngmt. Care Gap', 'Salary/Benefit Gap', 'Culture/Fun Gap', 'Training/Learn Gap'],
+            datasets: [{
+                label: 'Importance',
+                data: [0.75, 0.12, 0.08, 0.03, 0.02],
+                backgroundColor: chartColors.primaryBg,
+                borderColor: chartColors.primary,
+                borderWidth: 2,
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            plugins: { legend: { display: false }, tooltip: tooltipConfig },
+            scales: {
+                x: { beginAtZero: true, grid: gridConfig(), ticks: ticksConfig() },
+                y: { grid: { display: false }, ticks: ticksConfig() }
+            }
+        }
+    });
+
+    // --- Section 5: Interactive Profiler ---
+    const profilerSlidersEl = document.getElementById('profiler-sliders');
+    const profilerData = [
+        { id: 'rating_gap', label: 'Overall Rating Gap', value: 0.1 },
+        { id: 'salary_benefits_gap', label: 'Salary & Benefits Gap', value: -0.05 },
+        { id: 'training_learning_gap', label: 'Training & Learning Gap', value: 0.2 },
+        { id: 'culture_fun_gap', label: 'Culture & Fun Gap', value: 0.0 },
+        { id: 'management_care_gap', label: 'Management Care Gap', value: 0.15 },
+        { id: 'office_workspace_gap', label: 'Office & Workspace Gap', value: -0.1 },
+    ];
+    
+    const profilerChartCtx = document.getElementById('profilerChart').getContext('2d');
+    let profilerChart = new Chart(profilerChartCtx, {
+        type: 'radar',
+        data: {
+            labels: profilerData.map(p => wrapLabels(p.label, 15)),
+            datasets: [{
+                label: 'Company vs Market Avg.',
+                data: profilerData.map(p => p.value),
+                backgroundColor: chartColors.whiteBg,
+                borderColor: chartColors.white,
+                borderWidth: 2,
+                pointBackgroundColor: chartColors.white,
+                pointBorderColor: '#fff',
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: chartColors.white,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: tooltipConfig,
+            },
+            scales: {
+                r: {
+                    angleLines: { color: 'rgba(255, 255, 255, 0.2)' },
+                    grid: { color: 'rgba(255, 255, 255, 0.2)' },
+                    pointLabels: {
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        font: { size: 12 }
+                    },
+                    ticks: {
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        backdropColor: 'transparent',
+                        stepSize: 0.25,
+                    },
+                    min: -0.5,
+                    max: 0.5
+                }
+            }
+        }
+    });
+
+    const recommendationTextEl = document.getElementById('recommendation-text');
+    
+    function updateProfiler() {
+        const values = [];
+        profilerData.forEach((item, index) => {
+            const slider = document.getElementById(item.id);
+            const value = parseFloat(slider.value);
+            values.push(value);
+            profilerData[index].value = value;
+            document.getElementById(`${item.id}-value`).textContent = value.toFixed(2);
+        });
+        
+        profilerChart.data.datasets[0].data = values;
+        profilerChart.update();
+        
+        // Recommendation logic (based on simple baseline)
+        const mainGap = profilerData.find(p => p.id === 'rating_gap').value;
+        if (mainGap > -0.072) { // Using the median from the notebook as a threshold
+            recommendationTextEl.textContent = 'Recommend';
+            recommendationTextEl.className = 'text-green-500';
+        } else {
+            recommendationTextEl.textContent = 'Not Recommend';
+            recommendationTextEl.className = 'text-red-500';
+        }
+    }
+
+    profilerData.forEach(item => {
+        const sliderContainer = document.createElement('div');
+        sliderContainer.className = 'mb-4';
+        
+        const labelContainer = document.createElement('div');
+        labelContainer.className = 'flex justify-between items-center text-sm mb-1';
+        
+        const label = document.createElement('label');
+        label.htmlFor = item.id;
+        label.textContent = item.label;
+        label.className = 'font-semibold text-indigo-200';
+        
+        const valueSpan = document.createElement('span');
+        valueSpan.id = `${item.id}-value`;
+        valueSpan.className = 'font-bold text-white bg-white/20 px-2 py-0.5 rounded-md';
+        valueSpan.textContent = item.value.toFixed(2);
+        
+        labelContainer.appendChild(label);
+        labelContainer.appendChild(valueSpan);
+        
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.id = item.id;
+        slider.min = -0.5;
+        slider.max = 0.5;
+        slider.step = 0.01;
+        slider.value = item.value;
+        slider.className = 'w-full h-2 bg-indigo-500 rounded-lg appearance-none cursor-pointer slider-track';
+        
+        slider.addEventListener('input', updateProfiler);
+        
+        sliderContainer.appendChild(labelContainer);
+        sliderContainer.appendChild(slider);
+        profilerSlidersEl.appendChild(sliderContainer);
+    });
+    
+    updateProfiler();
+});
+</script>
+</body>
+</html>
