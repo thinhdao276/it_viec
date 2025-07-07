@@ -7,8 +7,15 @@ import pandas as pd
 import numpy as np
 import warnings
 from typing import Tuple, Optional, Dict, Any
-import joblib
 import os
+
+# Import joblib with error handling
+try:
+    import joblib
+except ImportError:
+    joblib = None
+    print("⚠️ joblib not available")
+
 warnings.filterwarnings('ignore')
 
 class CompanyRecommendationPipeline:
@@ -482,6 +489,16 @@ def load_trained_models(models_dir: str = 'models') -> Tuple[Dict[str, Any], Dic
     models = {}
     metadata = {}
     
+    # Try to import joblib locally if not available globally
+    try:
+        if joblib is None:
+            import joblib as local_joblib
+        else:
+            local_joblib = joblib
+    except ImportError:
+        print("❌ joblib not available - cannot load models")
+        return models, metadata
+    
     try:
         import json
         
@@ -491,25 +508,68 @@ def load_trained_models(models_dir: str = 'models') -> Tuple[Dict[str, Any], Dic
             with open(metadata_path, 'r') as f:
                 metadata = json.load(f)
         
+        # Check if models directory exists
+        if not os.path.exists(models_dir):
+            print(f"❌ Models directory not found: {models_dir}")
+            return models, metadata
+        
         # Load models
         model_files = [f for f in os.listdir(models_dir) if f.endswith('.pkl')]
+        
+        if not model_files:
+            print(f"❌ No .pkl files found in {models_dir}")
+            return models, metadata
+        
+        print(f"📂 Found {len(model_files)} model files: {model_files}")
         
         for model_file in model_files:
             model_name = model_file.replace('.pkl', '')
             model_path = os.path.join(models_dir, model_file)
             
             try:
-                model = joblib.load(model_path)
-                models[model_name] = model
-                print(f"✅ Loaded {model_name}")
+                print(f"🔄 Loading {model_name} from {model_path}...")
+                loaded_data = local_joblib.load(model_path)
+                
+                # Handle different model storage formats
+                if isinstance(loaded_data, dict):
+                    print(f"📦 {model_name} loaded as dict with keys: {list(loaded_data.keys())}")
+                    # If it's a dict, try to extract the actual model
+                    if 'model' in loaded_data:
+                        actual_model = loaded_data['model']
+                        if hasattr(actual_model, 'predict'):
+                            models[model_name] = actual_model
+                            print(f"✅ Successfully loaded {model_name} (extracted from dict) - Type: {type(actual_model).__name__}")
+                        else:
+                            print(f"⚠️ {model_name}: Model in dict doesn't have predict method - Type: {type(actual_model)}")
+                    else:
+                        # Check if the dict itself might be a model (sklearn sometimes does this)
+                        if hasattr(loaded_data, 'predict'):
+                            models[model_name] = loaded_data
+                            print(f"✅ Successfully loaded {model_name} (dict with predict) - Type: {type(loaded_data)}")
+                        else:
+                            print(f"⚠️ {model_name}: Dict doesn't contain 'model' key and no predict method")
+                            # Store as-is for debugging but mark as problematic
+                            models[model_name] = loaded_data
+                elif hasattr(loaded_data, 'predict'):
+                    # Direct model object
+                    models[model_name] = loaded_data
+                    print(f"✅ Successfully loaded {model_name} (direct model) - Type: {type(loaded_data).__name__}")
+                else:
+                    print(f"⚠️ {model_name}: Unknown format without predict method - Type: {type(loaded_data)}")
+                    models[model_name] = loaded_data
+                    
             except Exception as e:
-                print(f"⚠️ Could not load {model_name}: {e}")
+                print(f"❌ Could not load {model_name}: {str(e)}")
+                import traceback
+                print(f"   Full error: {traceback.format_exc()}")
         
-        print(f"✅ Loaded {len(models)} models")
+        print(f"✅ Successfully loaded {len(models)} models out of {len(model_files)} files")
         return models, metadata
         
     except Exception as e:
         print(f"❌ Error loading models: {e}")
+        import traceback
+        print(f"   Full traceback: {traceback.format_exc()}")
         return {}, {}
 
 
@@ -680,31 +740,6 @@ def predict_company_recommendation(company_data: Dict[str, Any], models: Dict[st
             
             # Get confidence if available
             if hasattr(model, 'predict_proba'):
-                probabilities = model.predict_proba(features_array)[0]
-                confidence = max(probabilities)
-            elif hasattr(model, 'decision_function'):
-                # For SVM and similar models
-                decision_score = model.decision_function(features_array)[0]
-                confidence = abs(decision_score) / (abs(decision_score) + 1)  # Normalize to [0,1]
-            else:
-                confidence = 0.75  # Default confidence for models without probability estimation
-            
-            result = {
-                'recommendation': bool(prediction),
-                'confidence': float(confidence),
-                'model_used': model_name,
-                'features_used': len(features),
-                'rating_gaps': rating_gaps,
-                'feature_values': dict(zip(feature_names, features))
-            }
-            
-            return result
-            
-        except Exception as pred_error:
-            return {'error': f'Prediction failed: {pred_error}'}
-        
-    except Exception as e:
-        return {'error': f'Prediction error: {e}'}
                 probabilities = model.predict_proba(features_array)[0]
                 confidence = max(probabilities)
             elif hasattr(model, 'decision_function'):
