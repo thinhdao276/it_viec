@@ -817,3 +817,32 @@ def get_company_insights(df: pd.DataFrame, company_name: str) -> Dict[str, Any]:
         
     except Exception as e:
         return {'error': f'Error getting insights: {e}'}
+
+
+def load_recommendation_modeling_data():
+    """Load data for recommendation modeling"""
+    try:
+        # Try to load from Excel files in data directory
+        data_path = os.path.join('data', 'final_data.xlsx')
+        if os.path.exists(data_path):
+            df = pd.read_excel(data_path)
+            return df
+        
+        # Try alternative paths
+        alt_paths = [
+            'notebooks/final_data.xlsx',
+            'final_data.xlsx',
+            'data/Overview_Reviews.xlsx'
+        ]
+        
+        for path in alt_paths:
+            if os.path.exists(path):
+                df = pd.read_excel(path)
+                return df
+        
+        print("❌ Could not find recommendation modeling data file")
+        return None
+        
+    except Exception as e:
+        print(f"❌ Error loading recommendation modeling data: {e}")
+        return None

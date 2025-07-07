@@ -1,32 +1,46 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
+import pickle
 import os
+import warnings
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import plotly.express as px
-from utils.preprocessing import preprocess_text
-from utils.recommendation_sklearn import (
-    get_company_recommendations, get_text_based_recommendations, build_sklearn_tfidf_model)
-from utils.recommendation_gensim import get_gensim_recommendations, build_gensim_model
-from utils.embedding_models import (
-    build_doc2vec_model, build_fasttext_model, build_bert_model,
-    get_doc2vec_recommendations, get_fasttext_recommendations, get_bert_recommendations)
-from utils.company_selection import (
-    load_company_data_for_picker, get_market_averages, calculate_rating_gaps, 
-    display_gap_analysis, create_company_spider_chart, make_prediction_with_model, 
-    clean_recommendation_data, create_enhanced_model_comparison_dashboard, 
-    create_interactive_eda_dashboard, create_about_authors_page)
-from utils.recommendation_modeling import load_trained_models, load_recommendation_modeling_data
+from datetime import datetime
+from collections import Counter
+import re
+from sklearn.feature_extraction.text import TfidfVectorizer, ENGLISH_STOP_WORDS
+from sklearn.metrics.pairwise import cosine_similarity
+from gensim import corpora, models, similarities
+import seaborn as sns
 
+
+warnings.filterwarnings('ignore')
+
+# Import company picker util
+from utils.company_selection import (
+    load_company_data_for_picker,
+    get_market_averages,
+    calculate_rating_gaps,
+    display_gap_analysis,
+    create_company_spider_chart,
+    make_prediction_with_model,
+    clean_recommendation_data,
+    create_enhanced_model_comparison_dashboard,
+    create_interactive_eda_dashboard,
+    create_about_authors_page
+)
+
+
+# Import load_trained_models from utils at the top
+from utils.recommendation_modeling import load_trained_models
 
 # Delayed import of joblib to avoid multiprocessing issues
 try:
     import joblib
 except ImportError:
     joblib = None
-
 
 # Configure Streamlit page
 st.set_page_config(
@@ -36,25 +50,21 @@ st.set_page_config(
     initial_sidebar_state="collapsed"  # Hidden by default
 )
 
-
 # Sidebar team information
 with st.sidebar:
-    st.markdown(
-        """
-        <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-            <h4 style="margin: 0; color: #1f77b4; text-align: center;">👥 Team Members</h4>
-            <hr style="margin: 10px 0;">
-            <p style="margin: 5px 0; font-size: 0.9em; text-align: center;"><strong>Đào Tuấn Thịnh</strong></p>
-            <p style="margin: 5px 0; font-size: 0.8em; color: #666; text-align: center;">daotuanthinh@gmail.com</p>
-            <p style="margin: 5px 0; font-size: 0.9em; text-align: center;"><strong>Trương Văn Lê</strong></p>
-            <p style="margin: 5px 0; font-size: 0.8em; color: #666; text-align: center;">truongvanle999@gmail.com</p>
-            <hr style="margin: 10px 0;">
-            <p style="margin: 5px 0; font-size: 0.8em; color: #666; text-align: center;">🎓 <em>Giảng Viên Hướng Dẫn:</em></p>
-            <p style="margin: 0; font-size: 0.8em; color: #666; text-align: center;"><em>Khuất Thị Phương</em></p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    st.markdown("""
+    <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+        <h4 style="margin: 0; color: #1f77b4; text-align: center;">👥 Team Members</h4>
+        <hr style="margin: 10px 0;">
+        <p style="margin: 5px 0; font-size: 0.9em; text-align: center;"><strong>Đào Tuấn Thịnh</strong></p>
+        <p style="margin: 5px 0; font-size: 0.8em; color: #666; text-align: center;">daotuanthinh@gmail.com</p>
+        <p style="margin: 5px 0; font-size: 0.9em; text-align: center;"><strong>Trương Văn Lê</strong></p>
+        <p style="margin: 5px 0; font-size: 0.8em; color: #666; text-align: center;">truongvanle999@gmail.com</p>
+        <hr style="margin: 10px 0;">
+        <p style="margin: 5px 0; font-size: 0.8em; color: #666; text-align: center;">🎓 <em>Giảng Viên Hướng Dẫn:</em></p>
+        <p style="margin: 0; font-size: 0.8em; color: #666; text-align: center;"><em>Khuất Thị Phương</em></p>
+    </div>
+    """, unsafe_allow_html=True)
     
 
 
@@ -154,18 +164,26 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Inline utility functions since utils might not be available
+def preprocess_text(text):
+    """Simple text preprocessing function"""
+    if isinstance(text, str):
+        text = text.lower()
+        text = text.replace('\n', ' ')
+        text = re.sub(r'[^a-z\s]', '', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+        tokens = text.split()
+        words = [word for word in tokens if word not in ENGLISH_STOP_WORDS]
+        words = [word for word in words if word not in {"company", "like", "job", "skills"}]
+        return ' '.join(words)
+    return ""
 
-
-
-# Cache data loading
-@st.cache_data
-def load_data():
-    """Load and cache data with error handling"""
+def load_and_preprocess_data():
+    """Load and preprocess data with error handling"""
     data_paths = [
-        "data/Overview_Companies.xlsx",
-        "./data/Overview_Companies.xlsx", 
+        "./data/Overview_Companies.xlsx",
         "../data/Overview_Companies.xlsx",
-        "Overview_Companies.xlsx"
+        "data/Overview_Companies.xlsx"
     ]
     
     df = None
@@ -174,19 +192,17 @@ def load_data():
             df = pd.read_excel(path)
             st.info(f"📊 Loaded raw data from {path} - preprocessing...")
             # Quick preprocessing
-            df_work = df[['Company Name', 'Company overview',
-                         'Company industry', 'Our key skills']].copy()
+            df_work = df[['Company Name', 'Company overview', 'Company industry', 'Our key skills']].copy()
             df_work.fillna("", inplace=True)
             df_work['combined_text'] = (
-                df_work['Company overview'] + " " +
-                df_work['Company industry'] + " " +
+                df_work['Company overview'] + " " + 
+                df_work['Company industry'] + " " + 
                 df_work['Our key skills']
             )
-            preprocessed_text = df_work['combined_text'].apply(preprocess_text)
-            df_work['preprocessed_text'] = preprocessed_text
+            df_work['preprocessed_text'] = df_work['combined_text'].apply(preprocess_text)
             df = df_work
             break
-        except Exception:
+        except Exception as e:
             continue
     
     if df is None:
@@ -195,6 +211,291 @@ def load_data():
         
     return df
 
+def load_recommendation_modeling_data():
+    """Load data for recommendation modeling system (from final_data.xlsx)"""
+    rec_data_paths = [
+        "notebooks/final_data.xlsx",
+        "./notebooks/final_data.xlsx",
+        "../notebooks/final_data.xlsx",
+        "final_data.xlsx"
+    ]
+    
+    df = None
+    for path in rec_data_paths:
+        try:
+            df = pd.read_excel(path)
+            st.success(f"✅ Loaded recommendation modeling data from {path}: {len(df)} reviews")
+            break
+        except Exception:
+            continue
+    
+    if df is None:
+        st.error("❌ Could not load recommendation modeling data")
+        
+    return df
+
+def build_sklearn_model(df):
+    """Build sklearn TF-IDF model"""
+    try:
+        vectorizer = TfidfVectorizer(stop_words='english', max_features=5000)
+        tfidf_matrix = vectorizer.fit_transform(df['preprocessed_text'])
+        similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
+        return vectorizer, tfidf_matrix, similarity_matrix
+    except Exception as e:
+        st.error(f"Error building sklearn model: {e}")
+        return None, None, None
+
+def build_gensim_model(df):
+    """Build Gensim TF-IDF model"""
+    try:
+        texts = [text.split() for text in df['preprocessed_text']]
+        dictionary = corpora.Dictionary(texts)
+        corpus = [dictionary.doc2bow(text) for text in texts]
+        tfidf_model = models.TfidfModel(corpus)
+        index = similarities.MatrixSimilarity(tfidf_model[corpus])
+        return dictionary, tfidf_model, index
+    except Exception as e:
+        st.error(f"Error building Gensim model: {e}")
+        return None, None, None
+
+def build_doc2vec_model(df):
+    """Build Doc2Vec model for document embeddings"""
+    try:
+        if not ADVANCED_NLP_AVAILABLE:
+            return None
+        
+        # Prepare tagged documents
+        documents = [TaggedDocument(words=text.split(), tags=[i]) 
+                    for i, text in enumerate(df['preprocessed_text'])]
+        
+        # Build Doc2Vec model
+        model = Doc2Vec(
+            documents, 
+            vector_size=100, 
+            window=5, 
+            min_count=2, 
+            workers=2, 
+            epochs=10
+        )
+        
+        return model
+    except Exception as e:
+        st.error(f"Error building Doc2Vec model: {e}")
+        return None
+
+def build_fasttext_model(df):
+    """Build FastText model for subword embeddings"""
+    try:
+        if not ADVANCED_NLP_AVAILABLE:
+            return None
+        
+        # Prepare text data for FastText
+        with open('temp_fasttext.txt', 'w', encoding='utf-8') as f:
+            for text in df['preprocessed_text']:
+                f.write(text + '\n')
+        
+        # Train FastText model
+        model = fasttext.train_unsupervised('temp_fasttext.txt', model='skipgram', dim=100)
+        
+        # Clean up temp file
+        import os
+        if os.path.exists('temp_fasttext.txt'):
+            os.remove('temp_fasttext.txt')
+        
+        return model
+    except Exception as e:
+        st.error(f"Error building FastText model: {e}")
+        return None
+
+def build_bert_model(df):
+    """Build BERT model for semantic embeddings"""
+    try:
+        if not ADVANCED_NLP_AVAILABLE:
+            return None
+        
+        # Load pre-trained BERT model with SSL verification disabled
+        import ssl
+        ssl._create_default_https_context = ssl._create_unverified_context
+        
+        model = SentenceTransformer('all-MiniLM-L6-v2')
+        
+        # Generate embeddings for all texts
+        embeddings = model.encode(df['preprocessed_text'].tolist(), show_progress_bar=False)
+        
+        return model, embeddings
+    except Exception as e:
+        st.warning(f"BERT model not available: {e}")
+        return None, None
+
+def get_sklearn_recommendations(company_name, similarity_matrix, df, top_k=5):
+    """Get recommendations using sklearn approach"""
+    try:
+        company_idx = df[df['Company Name'] == company_name].index[0]
+        sim_scores = list(enumerate(similarity_matrix[company_idx]))
+        sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+        sim_scores = sim_scores[1:top_k+1]  # Exclude the company itself
+        
+        indices = [i[0] for i in sim_scores]
+        scores = [i[1] for i in sim_scores]
+        
+        recommendations = df.iloc[indices].copy()
+        recommendations['Similarity Score'] = scores
+        return recommendations[['Company Name', 'Company industry', 'Our key skills', 'Similarity Score']]
+    except Exception as e:
+        st.error(f"Error getting sklearn recommendations: {e}")
+        return pd.DataFrame()
+
+def get_gensim_recommendations(company_name, dictionary, tfidf_model, index, df, top_k=5):
+    """Get recommendations using Gensim approach"""
+    try:
+        company_row = df[df['Company Name'] == company_name]
+        if company_row.empty:
+            return pd.DataFrame()
+            
+        company_text = company_row['preprocessed_text'].iloc[0].split()
+        bow = dictionary.doc2bow(company_text)
+        tfidf_vec = tfidf_model[bow]
+        
+        similarities = index[tfidf_vec]
+        sim_scores = list(enumerate(similarities))
+        sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+        
+        company_idx = company_row.index[0]
+        sim_scores = [score for score in sim_scores if score[0] != company_idx]
+        sim_scores = sim_scores[:top_k]
+        
+        indices = [i[0] for i in sim_scores]
+        scores = [i[1] for i in sim_scores]
+        
+        recommendations = df.iloc[indices].copy()
+        recommendations['Similarity Score'] = scores
+        return recommendations[['Company Name', 'Company industry', 'Our key skills', 'Similarity Score']]
+    except Exception as e:
+        st.error(f"Error getting Gensim recommendations: {e}")
+        return pd.DataFrame()
+
+def get_doc2vec_recommendations(company_name, doc2vec_model, df, top_k=5):
+    """Get recommendations using Doc2Vec"""
+    try:
+        if doc2vec_model is None:
+            return pd.DataFrame()
+        
+        company_idx = df[df['Company Name'] == company_name].index[0]
+        
+        # Get vector for the target company
+        target_vector = doc2vec_model.dv[company_idx]
+        
+        # Calculate similarities
+        similarities = []
+        for i in range(len(df)):
+            if i != company_idx:
+                sim = doc2vec_model.dv.similarity(company_idx, i)
+                similarities.append((i, sim))
+        
+        # Sort by similarity
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        top_similarities = similarities[:top_k]
+        
+        # Get recommendations
+        indices = [i[0] for i in top_similarities]
+        scores = [i[1] for i in top_similarities]
+        
+        recommendations = df.iloc[indices].copy()
+        recommendations['Similarity Score'] = scores
+        return recommendations[['Company Name', 'Company industry', 'Our key skills', 'Similarity Score']]
+    except Exception as e:
+        st.error(f"Error getting Doc2Vec recommendations: {e}")
+        return pd.DataFrame()
+
+def get_fasttext_recommendations(company_name, fasttext_model, df, top_k=5):
+    """Get recommendations using FastText"""
+    try:
+        if fasttext_model is None:
+            return pd.DataFrame()
+        
+        company_row = df[df['Company Name'] == company_name]
+        if company_row.empty:
+            return pd.DataFrame()
+        
+        company_text = company_row['preprocessed_text'].iloc[0]
+        
+        # Get sentence embedding by averaging word embeddings
+        words = company_text.split()
+        target_embedding = np.mean([fasttext_model.get_word_vector(word) for word in words if word in fasttext_model.words], axis=0)
+        
+        # Calculate similarities
+        similarities = []
+        for idx, text in enumerate(df['preprocessed_text']):
+            if idx != company_row.index[0]:
+                words = text.split()
+                text_embedding = np.mean([fasttext_model.get_word_vector(word) for word in words if word in fasttext_model.words], axis=0)
+                sim = cosine_similarity(np.array([target_embedding]), np.array([text_embedding]))[0][0]
+                similarities.append((idx, sim))
+        
+        # Sort and get top recommendations
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        top_similarities = similarities[:top_k]
+        
+        indices = [i[0] for i in top_similarities]
+        scores = [i[1] for i in top_similarities]
+        
+        recommendations = df.iloc[indices].copy()
+        recommendations['Similarity Score'] = scores
+        return recommendations[['Company Name', 'Company industry', 'Our key skills', 'Similarity Score']]
+    except Exception as e:
+        st.error(f"Error getting FastText recommendations: {e}")
+        return pd.DataFrame()
+
+def get_bert_recommendations(company_name, bert_model, bert_embeddings, df, top_k=5):
+    """Get recommendations using BERT"""
+    try:
+        if bert_model is None or bert_embeddings is None:
+            return pd.DataFrame()
+        
+        company_idx = df[df['Company Name'] == company_name].index[0]
+        target_embedding = bert_embeddings[company_idx]
+        
+        # Calculate similarities
+        similarities = cosine_similarity(np.array([target_embedding]), bert_embeddings)[0]
+        
+        # Get top similar companies (excluding self)
+        sim_scores = list(enumerate(similarities))
+        sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+        sim_scores = [score for score in sim_scores if score[0] != company_idx]
+        sim_scores = sim_scores[:top_k]
+        
+        indices = [i[0] for i in sim_scores]
+        scores = [i[1] for i in sim_scores]
+        
+        recommendations = df.iloc[indices].copy()
+        recommendations['Similarity Score'] = scores
+        return recommendations[['Company Name', 'Company industry', 'Our key skills', 'Similarity Score']]
+    except Exception as e:
+        st.error(f"Error getting BERT recommendations: {e}")
+        return pd.DataFrame()
+
+def get_text_based_recommendations(query_text, vectorizer, tfidf_matrix, df, top_k=5):
+    """Get recommendations based on text query"""
+    try:
+        processed_query = preprocess_text(query_text)
+        query_vec = vectorizer.transform([processed_query])
+        similarities = cosine_similarity(query_vec, tfidf_matrix).flatten()
+        
+        top_indices = similarities.argsort()[::-1][:top_k]
+        top_scores = similarities[top_indices]
+        
+        recommendations = df.iloc[top_indices].copy()
+        recommendations['Similarity Score'] = top_scores
+        return recommendations[['Company Name', 'Company industry', 'Our key skills', 'Similarity Score']]
+    except Exception as e:
+        st.error(f"Error getting text-based recommendations: {e}")
+        return pd.DataFrame()
+
+# Cache data loading
+@st.cache_data
+def load_data():
+    """Load and cache data"""
+    return load_and_preprocess_data()
 
 @st.cache_resource
 def build_models(df):
@@ -202,9 +503,7 @@ def build_models(df):
     if df is None:
         return None, None, None, None, None, None, None, None, None, None
     
-    sklearn_vectorizer, sklearn_tfidf, sklearn_similarity = (
-        build_sklearn_tfidf_model(df)
-    )
+    sklearn_vectorizer, sklearn_tfidf, sklearn_similarity = build_sklearn_model(df)
     gensim_dict, gensim_tfidf, gensim_index = build_gensim_model(df)
     doc2vec_model = build_doc2vec_model(df)
     fasttext_model = build_fasttext_model(df)
@@ -214,11 +513,9 @@ def build_models(df):
     else:
         bert_model, bert_embeddings = None, None
     
-    return (sklearn_vectorizer, sklearn_tfidf, sklearn_similarity,
-            gensim_dict, gensim_tfidf, gensim_index,
+    return (sklearn_vectorizer, sklearn_tfidf, sklearn_similarity, 
+            gensim_dict, gensim_tfidf, gensim_index, 
             doc2vec_model, fasttext_model, bert_model, bert_embeddings)
-
-
 
 def create_wordcloud_plot(text_data, title):
     """Create word cloud visualization"""
@@ -241,19 +538,20 @@ def create_wordcloud_plot(text_data, title):
             ax.set_title(title, fontsize=16, fontweight='bold')
             return fig
     except ImportError:
-        st.info("WordCloud library not available. "
-                "Install with: pip install wordcloud")
+        st.info("WordCloud library not available. Install with: pip install wordcloud")
     except Exception as e:
         st.error(f"Error creating word cloud: {e}")
     return None
 
-
 # Advanced NLP imports
 try:
+    from gensim.models.doc2vec import Doc2Vec, TaggedDocument
+    from sentence_transformers import SentenceTransformer
+    import fasttext
     ADVANCED_NLP_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     ADVANCED_NLP_AVAILABLE = False
-
+    # st.info(f"Advanced NLP models not available: {e}")
 
 def main():
     # Load ITViec logo
@@ -290,33 +588,27 @@ def main():
     with st.spinner("🔄 Loading data and building models..."):
         df = load_data()
         if df is not None:
-            models = build_models(df)
-            (sklearn_vectorizer, sklearn_tfidf, sklearn_similarity,
-             gensim_dict, gensim_tfidf, gensim_index,
-             doc2vec_model, fasttext_model, bert_model, bert_embeddings) = models
+            (sklearn_vectorizer, sklearn_tfidf, sklearn_similarity, 
+             gensim_dict, gensim_tfidf, gensim_index, 
+             doc2vec_model, fasttext_model, bert_model, bert_embeddings) = build_models(df)
         else:
             sklearn_vectorizer = sklearn_tfidf = sklearn_similarity = None
             gensim_dict = gensim_tfidf = gensim_index = None
-            doc2vec_model = fasttext_model = bert_model = None
-            bert_embeddings = None
+            doc2vec_model = fasttext_model = bert_model = bert_embeddings = None
 
     # Display current page
-    current_page = st.session_state.current_page
-    if current_page == "Content-Based Company Similarity System":
-        display_content_based_page(
-            df, sklearn_vectorizer, sklearn_tfidf, sklearn_similarity,
-            gensim_dict, gensim_tfidf, gensim_index,
-            doc2vec_model, fasttext_model, bert_model, bert_embeddings)
-    elif current_page == "Recommendation Modeling System":
+    if st.session_state.current_page == "Content-Based Company Similarity System":
+        display_content_based_page(df, sklearn_vectorizer, sklearn_tfidf, sklearn_similarity, 
+                                 gensim_dict, gensim_tfidf, gensim_index, 
+                                 doc2vec_model, fasttext_model, bert_model, bert_embeddings)
+    elif st.session_state.current_page == "Recommendation Modeling System":
         display_recommendation_modeling_page(df)
-    elif current_page == "About":
+    elif st.session_state.current_page == "About":
         display_about_page()
 
-
-def display_content_based_page(df, sklearn_vectorizer, sklearn_tfidf,
-                               sklearn_similarity, gensim_dict, gensim_tfidf,
-                               gensim_index, doc2vec_model, fasttext_model,
-                               bert_model, bert_embeddings):
+def display_content_based_page(df, sklearn_vectorizer, sklearn_tfidf, sklearn_similarity, 
+                              gensim_dict, gensim_tfidf, gensim_index, 
+                              doc2vec_model, fasttext_model, bert_model, bert_embeddings):
     """Display Content-Based Company Similarity System page"""
     st.markdown('<h2 class="section-header">🔍 Content-Based Company Similarity System</h2>', unsafe_allow_html=True)
     
@@ -334,22 +626,127 @@ def display_content_based_page(df, sklearn_vectorizer, sklearn_tfidf,
     
     with tab1:
         st.markdown('<h3 class="tab-header">📖 About Content-Based Similarity System</h3>', unsafe_allow_html=True)
-        # Try to load from docs/content_based_about.md, fallback to README.md section if not found
-        import os
-        about_md_path = os.path.join(os.path.dirname(__file__), 'docs', 'content_based_about.md')
-        readme_path = os.path.join(os.path.dirname(__file__), 'README.md')
-        about_content = None
-        if os.path.exists(about_md_path):
-            with open(about_md_path, encoding='utf-8') as f:
-                about_content = f.read()
-        elif os.path.exists(readme_path):
-            # Optionally, extract a section from README.md if you want
-            with open(readme_path, encoding='utf-8') as f:
-                about_content = f.read()
-        if about_content:
-            st.markdown(about_content, unsafe_allow_html=True)
-        else:
-            st.info("Project documentation not found. Please see README.md for more info.")
+        
+        st.markdown("""
+        ### 🎯 Business Objective
+        **Requirement 1:** Based on information from companies posted on ITViec, suggest similar companies based on content description.
+        
+        #### 📊 System Overview
+        This Content-Based Similarity system analyzes company information to find similar organizations based on:
+        - **Company Overview**: Detailed business descriptions
+        - **Company Industry**: Business sectors and domains  
+        - **Key Skills**: Technical competencies and technologies
+        
+        ### 🔬 Implemented Algorithms
+        
+        | Algorithm | Description | Strengths | Speed | Quality |
+        |-----------|-------------|-----------|-------|---------|
+        | **TF-IDF (Scikit-learn)** | Traditional term frequency approach | Fast, reliable, simple | ⚡⚡⚡ | ⭐⭐⭐ |
+        | **TF-IDF (Gensim)** | Alternative implementation | Memory efficient, scalable | ⚡⚡ | ⭐⭐⭐ |
+        | **Doc2Vec** | Document-level vector representations | Context-aware, semantic | ⚡ | ⭐⭐⭐⭐ |
+        | **FastText** | Subword information embeddings | Handles rare words, multilingual | ⚡ | ⭐⭐⭐⭐ |
+        | **BERT** | Transformer-based understanding | State-of-the-art semantic | ⚡ | ⭐⭐⭐⭐⭐ |
+        
+        ### 🏗️ System Architecture
+        ```
+        📊 Data Input → 🧹 Text Preprocessing → 🔧 Feature Engineering → 🤖 ML Models → 📈 Similarity Computation → 🎯 Recommendations
+              ↓                    ↓                     ↓                   ↓                    ↓                    ↓
+        Companies.xlsx → Clean & Tokenize → TF-IDF/Embeddings → 5 ML Algorithms → Cosine Similarity → Top-K Results
+        ```
+        
+        ### 📊 Data Requirements
+        The system works with **3 main columns**:
+        - **Company Name**: Name of the company
+        - **Company overview**: Detailed description of the company
+        - **Our key skills**: Technologies and skills the company specializes in
+        
+        ### 🚀 Key Features & Implementation
+        - **🤖 Multi-Model Approach**: 5 different ML algorithms for comprehensive analysis
+        - **📊 Beautiful Visualizations**: Interactive dashboards and fancy charts  
+        - **⚡ Dual Functionality**: Company-to-company and text-to-company recommendations
+        - **🛠️ Streamlit Ready**: Production-ready functions for easy integration
+        - **📈 Performance Analysis**: Comprehensive model comparison and benchmarking
+        
+        ### 🔧 Core Utils Functions Used
+        
+        #### 📁 utils/preprocessing.py
+        - `preprocess_text()` - Advanced text cleaning with Vietnamese support
+        - `load_and_preprocess_data()` - Intelligent data loading with caching
+        - `remove_stopwords()` - Multi-language stopword removal
+        
+        #### 🤖 utils/recommendation_sklearn.py  
+        - `build_sklearn_tfidf_model()` - TF-IDF vectorization using Scikit-learn
+        - `get_company_recommendations()` - Company similarity matching
+        - `get_text_based_recommendations()` - Text query to company search
+        
+        #### 🧬 utils/recommendation_gensim.py
+        - `build_gensim_tfidf_model_and_index()` - Gensim TF-IDF implementation
+        - `get_gensim_recommendations()` - Gensim-based similarity search
+        - `build_gensim_dictionary_and_corpus()` - Corpus preparation
+        
+        #### 📊 utils/visualization.py
+        - `create_similarity_chart()` - Interactive similarity visualizations
+        - `create_wordcloud()` - Beautiful word cloud generation
+        - `create_industry_chart()` - Industry distribution plots
+        
+        ### 📂 Project File Structure
+        ```
+        📁 it_viec/
+        ├── 📄 app.py                           # Main Streamlit application
+        ├── 📄 app_new_structure.py            # Alternative app structure
+        ├── 📄 fasttext_corpus.txt             # FastText training corpus
+        ├── 📄 Overview_Companies_preprocessed.csv # Preprocessed company data
+        ├── 📄 prompt.md                       # Project prompt and requirements
+        ├── 📄 README.md                       # Project documentation
+        ├── 📄 requirements.txt                # Python dependencies
+        ├── 📄 run.sh                          # Execution script
+        ├── 📄 thinhdao.typ                    # Additional documentation
+        ├── 📁 __pycache__/                    # Python cache files
+        ├── 📁 archive/                        # Archived versions and experiments
+        │   ├── 📄 app_archive.py
+        │   ├── 📄 note.ipynb
+        │   ├── 📄 Recommendation Modeling - working copy.ipynb
+        │   ├── 📄 Recommendation Modeling - working.ipynb
+        │   ├── 📄 Recommendation Modeling V2.ipynb
+        │   ├── 📄 Recommendation Modeling.ipynb
+        │   ├── 📄 supervised_truongvanle.ipynb
+        │   ├── 📄 vietnamese_process.py
+        │   ├── 📄 yeucau1.ipynb
+        │   └── 📄 yeucau2.ipynb
+        ├── 📁 data/                           # Raw data files
+        │   ├── 📄 Overview_Companies.xlsx
+        │   ├── 📄 Overview_Reviews.xlsx
+        │   └── 📄 Reviews.xlsx
+        ├── 📁 models/                         # Trained ML models
+        │   ├── 📄 CatBoost.pkl
+        │   ├── 📄 KNN.pkl
+        │   ├── 📄 LightGBM.pkl
+        │   ├── 📄 Logistic_Regression.pkl
+        │   ├── 📄 models_metadata.json
+        │   ├── 📄 Naive_Bayes.pkl
+        │   ├── 📄 Random_Forest.pkl
+        │   └── 📄 SVM.pkl
+        ├── 📁 notebooks/                      # Jupyter notebooks for analysis
+        │   ├── 📄 Content Based Suggestion.ipynb
+        │   ├── 📄 final_data.xlsx
+        │   ├── 📄 Project 1 - Exe 1 - Sentiment Analysis.ipynb
+        │   ├── 📄 Recommendation Modeling Pyspark.ipynb
+        │   └── 📄 Recommendation Modeling.ipynb
+        └── 📁 utils/                          # Utility functions and modules
+            ├── 📄 __init__.py
+            ├── 📄 preprocessing.py            # Data preprocessing utilities
+            ├── 📄 recommendation_gensim.py    # Gensim-based recommendations
+            ├── 📄 recommendation_sklearn.py   # Scikit-learn based recommendations
+            ├── 📄 visualization.py            # Plotting and visualization functions
+            └── 📁 __pycache__/                # Python cache files
+        ```
+        
+        ### ⚡ Performance Optimizations
+        - **Smart Caching**: Preprocessed data caching for faster loading
+        - **Lazy Loading**: Models loaded on-demand for better memory usage
+        - **Parallel Processing**: Multi-core utilization for large datasets
+        - **Memory Efficiency**: Sparse matrices and optimized data structures
+        """)
     
     with tab2:
         st.markdown('<h3 class="tab-header">🏢 Company Recommendation</h3>', unsafe_allow_html=True)
@@ -392,7 +789,7 @@ def display_content_based_page(df, sklearn_vectorizer, sklearn_tfidf,
                         with st.spinner("🔄 Running all models for comparison..."):
                             # 1. Scikit-learn TF-IDF
                             if sklearn_similarity is not None:
-                                sklearn_recs = get_company_recommendations(
+                                sklearn_recs = get_sklearn_recommendations(
                                     selected_company, sklearn_similarity, df, num_recommendations
                                 )
                                 if not sklearn_recs.empty:
@@ -630,7 +1027,7 @@ def display_content_based_page(df, sklearn_vectorizer, sklearn_tfidf,
                     elif recommendation_method == "sklearn_tfidf":
                         st.subheader("🔬 Scikit-learn TF-IDF Results")
                         if sklearn_similarity is not None:
-                            recommendations = get_company_recommendations(
+                            recommendations = get_sklearn_recommendations(
                                 selected_company, sklearn_similarity, df, num_recommendations
                             )
                             if not recommendations.empty:
@@ -710,7 +1107,7 @@ def display_content_based_page(df, sklearn_vectorizer, sklearn_tfidf,
                     else:
                         st.info(f"🚧 {recommendation_method} implementation coming soon! Currently showing sklearn_tfidf results.")
                         if sklearn_similarity is not None:
-                            recommendations = get_company_recommendations(
+                            recommendations = get_sklearn_recommendations(
                                 selected_company, sklearn_similarity, df, num_recommendations
                             )
                             if not recommendations.empty:
@@ -908,7 +1305,7 @@ def display_content_based_page(df, sklearn_vectorizer, sklearn_tfidf,
                 model_results = {}
                 
                 if sklearn_similarity is not None:
-                    sklearn_recs = get_company_recommendations(sample_company, sklearn_similarity, df, 5)
+                    sklearn_recs = get_sklearn_recommendations(sample_company, sklearn_similarity, df, 5)
                     if not sklearn_recs.empty:
                         model_results['Scikit-learn TF-IDF'] = sklearn_recs['Similarity Score'].mean()
                 
@@ -1005,56 +1402,85 @@ def display_recommendation_modeling_page(df):
         "📈 Model Performance", 
         "📊 Company Analysis"
     ])
+    
     with tab1:
         st.markdown('<h3 class="tab-header">📖 About Recommendation Modeling</h3>', unsafe_allow_html=True)
-        import os
-        about_md_path = os.path.join(os.path.dirname(__file__), 'docs', 'recommendation_modeling_about.md')
-        readme_path = os.path.join(os.path.dirname(__file__), 'README.md')
-        about_content = None
-        if os.path.exists(about_md_path):
-            with open(about_md_path, encoding='utf-8') as f:
-                about_content = f.read()
-        elif os.path.exists(readme_path):
-            with open(readme_path, encoding='utf-8') as f:
-                about_content = f.read()
-        if about_content:
-            st.markdown(about_content, unsafe_allow_html=True)
-        else:
-            st.info("Project documentation not found. Please see README.md for more info.")
+        
+        st.markdown("""
+        ### 🎯 Business Objective
+        **Requirement 2:** Build a machine learning system to predict whether to recommend a company based on:
+        - Text analysis of employee reviews (from "What I liked" column)
+        - Company clustering patterns  
+        - Rating gap analysis vs market average
+        
+        ### 🔬 New Methodology: Clustering + Rating Gap Analysis
+        
+        #### ❌ **Old Approach (Similarity-based):**
+        - Created similarity scores between company pairs
+        - Used TF-IDF on full text descriptions  
+        - Target based on similarity threshold
+        - **Risk:** Recommended similar companies, not necessarily good ones
+        
+        #### ✅ **New Approach (Performance-based):**
+        - **Only uses "What I liked" column** for text analysis
+        - **Company clustering** to group similar companies
+        - **Rating gaps** compared to market average
+        - **Target based on actual performance** of companies
+        - **Value:** Recommends objectively better companies
+        
+        ### 🔧 Key Innovation: Rating Gap Analysis
+        Measuring how companies perform relative to market benchmarks across:
+        - **Rating Gap**: Overall rating vs market average
+        - **Salary & Benefits Gap**: vs market average
+        - **Culture & Fun Gap**: vs market average  
+        - **Training & Learning Gap**: vs market average
+        - **Management Care Gap**: vs market average
+        - **Office & Workspace Gap**: vs market average
+        
+        ### 🤖 Available Models
+        Our system includes multiple trained machine learning models:
+        - **Random Forest**: Ensemble model with feature importance
+        - **Logistic Regression**: Linear model for baseline comparison
+        - **LightGBM**: Gradient boosting for high performance
+        - **CatBoost**: Auto-categorical feature handling
+        - **SVM**: Support Vector Machine classifier
+        - **KNN**: K-Nearest Neighbors classifier
+        - **Naive Bayes**: Probabilistic classifier
+        
+        All models achieve **90%+ accuracy** in predicting company recommendations.
+        """)
     
     with tab2:
         st.markdown('<h3 class="tab-header">🎯 Predict Company Recommendation</h3>', unsafe_allow_html=True)
-
+        
         # Company selection method
         prediction_method = st.radio(
             "Select Prediction Method:",
             ["📊 Analyze Existing Company", "✋ Manual Input"],
             horizontal=True
         )
-
-        compare_models = st.checkbox("Compare Model", value=False, help="Compare all models or use only LightGBM for prediction.")
-
+        
         if prediction_method == "📊 Analyze Existing Company":
             # Load company data for picker
             company_data = load_company_data_for_picker()
-
+            
             if not company_data.empty:
                 col1, col2 = st.columns([2, 1])
-
+                
                 with col1:
                     selected_company = st.selectbox(
                         "Select a Company to Analyze:",
                         options=company_data['Company Name'].tolist(),
                         help="Choose a company to analyze its recommendation potential"
                     )
-
+                
                 with col2:
                     if st.button("📊 Load Company Data", help="Load the selected company's information"):
                         company_info = company_data[company_data['Company Name'] == selected_company].iloc[0]
-
+                        
                         # Store in session state
                         st.session_state.selected_company_info = company_info
-
+                        
                         # Get ratings and store in session state for sliders
                         overall = company_info.get('Rating', 3.7)
                         salary = company_info.get('Salary & benefits', 3.6)
@@ -1062,7 +1488,7 @@ def display_recommendation_modeling_page(df):
                         management = company_info.get('Management cares about me', 3.5)
                         training = company_info.get('Training & learning', 3.5)
                         office = company_info.get('Office & workspace', 3.6)
-
+                        
                         # Auto-fill the manual input section
                         st.session_state.auto_overall = overall
                         st.session_state.auto_salary = salary
@@ -1073,44 +1499,44 @@ def display_recommendation_modeling_page(df):
                         st.session_state.auto_company_size = company_info.get('Company size', '101-500')
                         st.session_state.auto_company_type = company_info.get('Company Type', 'Product')
                         st.session_state.auto_overtime_policy = company_info.get('Overtime Policy', 'Flexible')
-
+                        
                         st.success(f"✅ Loaded data for {selected_company}")
                         st.rerun()  # Force rerun to update the sliders
-
+                
                 # Display loaded company information
                 if 'selected_company_info' in st.session_state:
                     company_info = st.session_state.selected_company_info
-
+                    
                     st.markdown("### 📋 Company Information")
-
+                    
                     # Display company details
                     col1, col2, col3 = st.columns(3)
-
+                    
                     with col1:
                         st.metric("Company", company_info['Company Name'])
                         if 'Company industry' in company_info:
                             industry_name = str(company_info['Company industry'])
                             display_name = industry_name[:30] + "..." if len(industry_name) > 30 else industry_name
                             st.metric("Industry", display_name)
-
+                    
                     with col2:
                         if 'Company size' in company_info:
                             st.metric("Size", company_info['Company size'])
                         if 'Company Type' in company_info:
                             st.metric("Type", company_info['Company Type'])
-
+                    
                     with col3:
                         if 'Overtime Policy' in company_info:
                             st.metric("OT Policy", company_info['Overtime Policy'])
-
+                    
             else:
                 st.warning("⚠️ Could not load company data. Please use manual input.")
-
+        
         # Manual input section (always visible)
         st.markdown("### ✋ Company Ratings Input")
-
+        
         col1, col2 = st.columns(2)
-
+        
         with col1:
             overall = st.slider("Overall Rating", 1.0, 5.0, 
                               st.session_state.get('auto_overall', 3.7), 0.1)
@@ -1118,7 +1544,7 @@ def display_recommendation_modeling_page(df):
                              st.session_state.get('auto_salary', 3.6), 0.1)
             culture = st.slider("Culture & Fun", 1.0, 5.0, 
                               st.session_state.get('auto_culture', 3.7), 0.1)
-
+        
         with col2:
             management = st.slider("Management Care", 1.0, 5.0, 
                                  st.session_state.get('auto_management', 3.5), 0.1)
@@ -1126,105 +1552,93 @@ def display_recommendation_modeling_page(df):
                                st.session_state.get('auto_training', 3.5), 0.1)
             office = st.slider("Office & Workspace", 1.0, 5.0, 
                              st.session_state.get('auto_office', 3.6), 0.1)
-
+        
         # Company metadata
         st.markdown("### 🏢 Company Characteristics")
         col1, col2, col3 = st.columns(3)
-
+        
         with col1:
             size_options = ["1-50", "51-100", "101-500", "501-1000", "1000+"]
             default_size = st.session_state.get('auto_company_size', '101-500')
             size_index = size_options.index(default_size) if default_size in size_options else 2
             company_size = st.selectbox("Company Size", size_options, index=size_index)
-
+        
         with col2:
             type_options = ["Product", "Outsourcing", "Service", "Startup"]
             default_type = st.session_state.get('auto_company_type', 'Product')
             type_index = type_options.index(default_type) if default_type in type_options else 0
             company_type = st.selectbox("Company Type", type_options, index=type_index)
-
+        
         with col3:
             ot_options = ["No OT", "Extra Salary", "Flexible", "Comp Time"]
             default_ot = st.session_state.get('auto_overtime_policy', 'Flexible')
             ot_index = ot_options.index(default_ot) if default_ot in ot_options else 2
             overtime_policy = st.selectbox("Overtime Policy", ot_options, index=ot_index)
-
+        
         # Calculate gaps and make prediction
         if st.button("🔮 Predict Recommendation", type="primary", use_container_width=True):
             # Calculate rating gaps
             gaps = calculate_rating_gaps(overall, salary, culture, management, training, office)
-
+            
             # Display gap analysis
             st.markdown("### 📊 Rating Gap Analysis")
             display_gap_analysis(gaps)
-
+            
             # Create spider chart
             st.markdown("### 🕷️ Company vs Market Comparison")
             company_ratings = [overall, salary, culture, management, training, office]
             market_averages = list(get_market_averages().values())
             create_company_spider_chart(company_ratings, market_averages)
-
+            
             # Model selection for prediction
             st.markdown("### 🤖 Model Predictions")
-
+            
             if models:
                 predictions = {}
-                if compare_models:
-                    # Compare all models
-                    for model_name in models.keys():
-                        prediction, confidence = make_prediction_with_model(
-                            gaps, company_size, company_type, overtime_policy, model_name, models
-                        )
-                        if prediction is not None:
-                            predictions[model_name] = {
-                                'prediction': prediction,
-                                'confidence': confidence
-                            }
-                else:
-                    # Only use LightGBM
-                    if 'LightGBM' in models:
-                        prediction, confidence = make_prediction_with_model(
-                            gaps, company_size, company_type, overtime_policy, 'LightGBM', models
-                        )
-                        if prediction is not None:
-                            predictions['LightGBM'] = {
-                                'prediction': prediction,
-                                'confidence': confidence
-                            }
-                    else:
-                        st.error("❌ LightGBM model not loaded")
-
+                
+                for model_name in models.keys():
+                    prediction, confidence = make_prediction_with_model(
+                        gaps, company_size, company_type, overtime_policy, model_name, models
+                    )
+                    
+                    if prediction is not None:
+                        predictions[model_name] = {
+                            'prediction': prediction,
+                            'confidence': confidence
+                        }
+                
                 # Display predictions
                 if predictions:
                     pred_cols = st.columns(min(len(predictions), 3))
+                    
                     for i, (model_name, result) in enumerate(predictions.items()):
                         with pred_cols[i % 3]:
                             recommendation = "✅ Recommend" if result['prediction'] == 1 else "❌ Not Recommend"
                             confidence_pct = f"{result['confidence']*100:.1f}%"
+                            
                             st.metric(
                                 label=model_name,
                                 value=recommendation,
                                 delta=f"Confidence: {confidence_pct}"
                             )
-
-                    if compare_models and len(predictions) > 1:
-                        # Ensemble prediction
-                        positive_votes = sum(1 for result in predictions.values() if result['prediction'] == 1)
-                        total_votes = len(predictions)
-                        ensemble_recommendation = positive_votes > total_votes / 2
-
-                        st.markdown("### 🎯 Ensemble Prediction")
-                        ensemble_result = "✅ **RECOMMEND**" if ensemble_recommendation else "❌ **NOT RECOMMEND**"
-                        vote_ratio = f"{positive_votes}/{total_votes} models recommend"
-
-                        st.markdown(
-                            f'<div class="recommendation-card">'
-                            f'<h3>{ensemble_result}</h3>'
-                            f'<p><strong>Consensus:</strong> {vote_ratio}</p>'
-                            f'<p><strong>Confidence:</strong> {abs(positive_votes - total_votes/2) / (total_votes/2) * 100:.1f}%</p>'
-                            f'</div>',
-                            unsafe_allow_html=True
-                        )
+                    
+                    # Ensemble prediction
+                    positive_votes = sum(1 for result in predictions.values() if result['prediction'] == 1)
+                    total_votes = len(predictions)
+                    ensemble_recommendation = positive_votes > total_votes / 2
+                    
+                    st.markdown("### 🎯 Ensemble Prediction")
+                    ensemble_result = "✅ **RECOMMEND**" if ensemble_recommendation else "❌ **NOT RECOMMEND**"
+                    vote_ratio = f"{positive_votes}/{total_votes} models recommend"
+                    
+                    st.markdown(f"""
+                    <div class="recommendation-card">
+                        <h3>{ensemble_result}</h3>
+                        <p><strong>Consensus:</strong> {vote_ratio}</p>
+                        <p><strong>Confidence:</strong> {abs(positive_votes - total_votes/2) / (total_votes/2) * 100:.1f}%</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
                 else:
                     st.error("❌ No models available for prediction")
             else:
@@ -1248,7 +1662,7 @@ def display_recommendation_modeling_page(df):
             create_enhanced_model_comparison_dashboard(models, model_metadata)
 
 def display_model_performance_tab(models):
-    # Display model performance comparison
+    """Display model performance comparison"""
     st.markdown('<h3 class="tab-header">📈 Model Performance</h3>', unsafe_allow_html=True)
     
     try:
@@ -1317,7 +1731,7 @@ def display_model_performance_tab(models):
 
 
 def display_company_eda_tab(rec_df):
-    # Display EDA and visualization tab
+    """Display EDA and visualization tab"""
     st.markdown('<h3 class="tab-header">📊 Company Analysis & EDA</h3>', unsafe_allow_html=True)
     
     if rec_df is None or rec_df.empty:

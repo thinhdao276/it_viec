@@ -73,57 +73,20 @@ Companies.xlsx → Clean & Tokenize → TF-IDF/Embeddings → 5 Algorithms → C
 | **Naive Bayes** | Probabilistic | Fast, simple | Text classification |
 | **KNN** | Instance-based | Local patterns | Similarity-based |
 
-## � Project File Structure
+## 📁 Project Structure (Simplified)
 
 ```
-📁 it_viec/
-├── 📄 app.py                           # Main Streamlit application
-├── 📄 app_new_structure.py            # Alternative app structure
-├── 📄 fasttext_corpus.txt             # FastText training corpus
-├── 📄 Overview_Companies_preprocessed.csv # Preprocessed company data
-├── 📄 prompt.md                       # Project prompt and requirements
-├── 📄 README.md                       # Project documentation
-├── 📄 requirements.txt                # Python dependencies
-├── 📄 run.sh                          # Execution script
-├── 📄 thinhdao.typ                    # Additional documentation
-├── 📁 __pycache__/                    # Python cache files
-├── 📁 archive/                        # Archived versions and experiments
-│   ├── 📄 app_archive.py
-│   ├── 📄 note.ipynb
-│   ├── 📄 Recommendation Modeling - working copy.ipynb
-│   ├── 📄 Recommendation Modeling - working.ipynb
-│   ├── 📄 Recommendation Modeling V2.ipynb
-│   ├── 📄 Recommendation Modeling.ipynb
-│   ├── 📄 supervised_truongvanle.ipynb
-│   ├── 📄 vietnamese_process.py
-│   ├── 📄 yeucau1.ipynb
-│   └── 📄 yeucau2.ipynb
-├── 📁 data/                           # Raw data files
-│   ├── 📄 Overview_Companies.xlsx
-│   ├── 📄 Overview_Reviews.xlsx
-│   └── 📄 Reviews.xlsx
-├── 📁 models/                         # Trained ML models
-│   ├── 📄 CatBoost.pkl
-│   ├── 📄 KNN.pkl
-│   ├── 📄 LightGBM.pkl
-│   ├── 📄 Logistic_Regression.pkl
-│   ├── 📄 models_metadata.json
-│   ├── 📄 Naive_Bayes.pkl
-│   ├── 📄 Random_Forest.pkl
-│   └── 📄 SVM.pkl
-├── 📁 notebooks/                      # Jupyter notebooks for analysis
-│   ├── 📄 Content Based Suggestion.ipynb
-│   ├── 📄 final_data.xlsx
-│   ├── 📄 Project 1 - Exe 1 - Sentiment Analysis.ipynb
-│   ├── 📄 Recommendation Modeling Pyspark.ipynb
-│   └── 📄 Recommendation Modeling.ipynb
-└── 📁 utils/                          # Utility functions and modules
-    ├── 📄 __init__.py
-    ├── 📄 preprocessing.py            # Data preprocessing utilities
-    ├── 📄 recommendation_gensim.py    # Gensim-based recommendations
-    ├── 📄 recommendation_sklearn.py   # Scikit-learn based recommendations
-    ├── 📄 visualization.py            # Plotting and visualization functions
-    └── 📁 __pycache__/                # Python cache files
+it_viec/
+├── app.py                # Main Streamlit application
+├── README.md             # Project documentation
+├── requirements.txt      # Python dependencies
+├── models/               # Trained ML models (e.g. .pkl, .json)
+├── utils/                # Utility modules (preprocessing, recommendation, etc.)
+├── data/                 # Raw data files (e.g. Overview_Companies.xlsx)
+├── notebooks/            # Jupyter notebooks for analysis
+├── archive/              # Archived scripts and experiments
+├── docs/                 # Markdown documentation for app tabs
+└── ...                   # Other supporting files
 ```
 
 ## 🔧 Utils Functions Overview

@@ -153,3 +153,25 @@ def get_gensim_text_based_recommendations(input_text, dictionary, tfidf_model, s
     recommended_companies['Similarity Score'] = scores
     
     return recommended_companies[['Company Name', 'Company industry', 'Our key skills', 'Similarity Score']]
+
+def build_gensim_model(df):
+    """
+    Build complete Gensim model (dictionary, TF-IDF, and similarity index).
+    
+    Args:
+        df (pd.DataFrame): DataFrame with preprocessed text
+        
+    Returns:
+        tuple: Dictionary, TF-IDF model, similarity index
+    """
+    try:
+        # Build dictionary and corpus
+        dictionary, corpus = build_gensim_dictionary_and_corpus(df['preprocessed_text'])
+        
+        # Build TF-IDF model and similarity index
+        tfidf_model, similarity_index = build_gensim_tfidf_model_and_index(corpus, dictionary)
+        
+        return dictionary, tfidf_model, similarity_index
+    except Exception as e:
+        print(f"Error building Gensim model: {e}")
+        return None, None, None
