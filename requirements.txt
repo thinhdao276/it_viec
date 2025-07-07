@@ -17,3 +17,4 @@ xgboost
 sentence-transformers
 fasttext # need to install separately
 # pybind11
+transformers<4.37
