@@ -13,8 +13,8 @@ streamlit-aggrid>=0.3.0
 seaborn>=0.12.0
 lightgbm
 catboost
-xgboost
 sentence-transformers
 fasttext # need to install separately
 # pybind11
 transformers<4.37
+joblib
