@@ -1097,134 +1097,120 @@ def create_about_authors_page():
     
     with col1:
         st.markdown("""
-        <div style="background: white; padding: 2rem; border-radius: 1rem; 
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-left: 5px solid #1f77b4; height: 100%;">
-            <div style="text-align: center; margin-bottom: 1.5rem;">
-                <h3 style="color: #1f77b4; margin: 0;">👨‍💼 Đào Tuấn Thịnh</h3>
-                <p style="color: #666; font-style: italic; margin: 0.5rem 0;">Senior Data Analyst & Engagement</p>
-            </div>
-            
-            <h4 style="color: #2e8b57; border-bottom: 2px solid #2e8b57; padding-bottom: 0.5rem;">
-                📞 Contact Information
-            </h4>
-            <ul style="list-style: none; padding-left: 0;">
-                <li style="margin: 0.5rem 0;"><strong>📧 Email:</strong> daotuanthinh@gmail.com</li>
-                <li style="margin: 0.5rem 0;"><strong>📱 Phone:</strong> (+84) 931770110</li>
-                <li style="margin: 0.5rem 0;"><strong>🐙 GitHub:</strong> thinhdao276</li>
-                <li style="margin: 0.5rem 0;"><strong>📍 Location:</strong> Thu Dau Mot, Binh Duong</li>
-                <li style="margin: 0.5rem 0;"><strong>🎂 Born:</strong> June 27, 1994</li>
-            </ul>
-            
-            <h4 style="color: #2e8b57; border-bottom: 2px solid #2e8b57; padding-bottom: 0.5rem;">
-                🎯 Professional Summary
-            </h4>
-            <p style="text-align: justify; line-height: 1.6;">
-                Highly motivated Senior Data Analyst with over <strong>5 years of experience</strong>, 
-                including significant expertise in manufacturing environments and Supply Chain Management. 
-                Proven ability to leverage advanced data analytics, BI tools (DOMO, Python, SQL), 
-                and process automation to drive Supply Chain Excellence.
-            </p>
-            
-            <h4 style="color: #2e8b57; border-bottom: 2px solid #2e8b57; padding-bottom: 0.5rem;">
-                💡 About Me
-            </h4>
-            <p style="text-align: justify; line-height: 1.6;">
-                I am a passionate and dedicated professional with a strong background in data analysis, 
-                digital transformation, and supply chain. My journey has been marked by a continuous 
-                desire to learn and grow, both personally and professionally. I thrive in environments 
-                that challenge me and provide opportunities to create a meaningful impact.
-            </p>
-            
-            <h4 style="color: #2e8b57; border-bottom: 2px solid #2e8b57; padding-bottom: 0.5rem;">
-                🛠️ Technical Skills
-            </h4>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                <div>
-                    <p><strong>Programming:</strong></p>
-                    <ul style="margin-left: 1rem;">
-                        <li>Python ⭐⭐⭐⭐⭐</li>
-                        <li>SQL ⭐⭐⭐⭐⭐</li>
-                        <li>R ⭐⭐⭐</li>
-                        <li>VBA ⭐⭐⭐</li>
-                    </ul>
-                </div>
-                <div>
-                    <p><strong>Data & Analytics:</strong></p>
-                    <ul style="margin-left: 1rem;">
-                        <li>Data Analysis & Visualization</li>
-                        <li>SCM KPI Reporting</li>
-                        <li>Predictive Analytics</li>
-                        <li>Machine Learning</li>
-                        <li>ETL Processes</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+### 👨‍💼 Đào Tuấn Thịnh
+*Senior Data Analyst & Engagement*
+
+---
+#### 📞 Contact Information
+- **📧 Email:** daotuanthinh@gmail.com
+- **📱 Phone:** (+84) 931770110
+- **🐙 GitHub:** thinhdao276
+- **📍 Location:** Thu Dau Mot, Binh Duong
+- **🎂 Born:** June 27, 1994
+
+---
+#### 🎯 Professional Summary
+Highly motivated Senior Data Analyst with over 5 years of experience, including significant expertise in manufacturing environments and Supply Chain Management. Proven ability to leverage advanced data analytics, BI tools (DOMO, Python, SQL with a strong aptitude for rapidly learning tools like Tableau and Alteryx), and process automation to drive Supply Chain Excellence. Specialized in SCM KPI reporting and analysis, material requirement planning and fostering a data-driven culture in global and cross-functional teams.
+
+---
+#### 💡 About Me
+I am a passionate and dedicated professional with a strong background in data analysis, digital transformation, and supply chain. My journey has been marked by a continuous desire to learn and grow, both personally and professionally. I thrive in environments that challenge me and provide opportunities to create a meaningful impact.
+
+I love learning and always seek out professional environments where I can expand my knowledge and skills. My goal is to create a greater impact by sharing my knowledge and experiences with others, fostering a culture of continuous improvement and innovation.
+
+---
+#### 🛠️ Technical Skills
+**Programming:**
+- Python ⭐⭐⭐⭐⭐
+- SQL ⭐⭐⭐⭐⭐
+- R ⭐⭐⭐
+- VBA ⭐⭐⭐
+- Google App Script
+
+**Data & Analytics:**
+- Data Analysis & Visualization
+- SCM KPI Reporting & Analysis
+- Predictive Analytics
+- Machine Learning
+- ETL Processes
+- Data Quality Management
+
+**BI & Data Tools:**
+- Power BI
+- DOMO
+- Python (Pandas, NumPy, Scikit-learn, Plotly/Dash)
+- Alteryx (conceptual understanding, quick to master)
+- Tableau (conceptual understanding, quick to master)
+
+**Supply Chain Management:**
+- Material Requirement Planning (MRP)
+- Inventory Management & Optimization
+- Logistics & Warehouse Operations
+- Demand Forecasting
+- Supply Chain Process Improvement
+- Service-Cost-Cash Optimization
+
+**Systems:**
+- SAP Power User
+- Experience with ERP systems
+- Data Warehouse Concepts (e.g., Snowflake)
+
+**Languages:**
+- English
+
+**Office:**
+- GSuite
+- MS Office
+
+**Others:**
+- Critical Problem-Solving
+- Cross-functional Team Leadership
+- Mentorship & Training
+        """)
     
     with col2:
         st.markdown("""
-        <div style="background: white; padding: 2rem; border-radius: 1rem; 
-                    box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-left: 5px solid #ff6b6b; height: 100%;">
-            <div style="text-align: center; margin-bottom: 1.5rem;">
-                <h3 style="color: #ff6b6b; margin: 0;">👨‍🔧 Trương Văn Lê</h3>
-                <p style="color: #666; font-style: italic; margin: 0.5rem 0;">Mechanical Engineer & Data Science Enthusiast</p>
-            </div>
-            
-            <h4 style="color: #2e8b57; border-bottom: 2px solid #2e8b57; padding-bottom: 0.5rem;">
-                📞 Contact Information
-            </h4>
-            <ul style="list-style: none; padding-left: 0;">
-                <li style="margin: 0.5rem 0;"><strong>📧 Email:</strong> truongvanle999@gmail.com</li>
-                <li style="margin: 0.5rem 0;"><strong>💼 Current Role:</strong> Mechanical Engineering</li>
-            </ul>
-            
-            <h4 style="color: #2e8b57; border-bottom: 2px solid #2e8b57; padding-bottom: 0.5rem;">
-                🎯 Professional Background
-            </h4>
-            <p style="text-align: justify; line-height: 1.6;">
-                Currently working in the <strong>mechanical engineering field</strong>, bringing a unique 
-                perspective to data science through hands-on industrial experience and technical expertise.
-            </p>
-            
-            <h4 style="color: #2e8b57; border-bottom: 2px solid #2e8b57; padding-bottom: 0.5rem;">
-                🎓 Why Data Science?
-            </h4>
-            <p style="text-align: justify; line-height: 1.6;">
-                "Hiện tại mọi thứ đều xoay quanh data, nên mong muốn tìm hiểu về data và cách data 
-                hoạt động cũng như có thể ứng dụng vào trong cuộc sống cũng như công việc."
-            </p>
-            <p style="text-align: justify; line-height: 1.6; font-style: italic; color: #666;">
-                <em>Translation: Currently everything revolves around data, so I want to learn about 
-                data and how data works as well as be able to apply it in life and work.</em>
-            </p>
-            
-            <h4 style="color: #2e8b57; border-bottom: 2px solid #2e8b57; padding-bottom: 0.5rem;">
-                📚 Learning Outcomes
-            </h4>
-            <p style="text-align: justify; line-height: 1.6;">
-                Through this Data Science course, achieved proficiency in:
-            </p>
-            <ul style="margin-left: 1rem;">
-                <li><strong>SQL</strong> - Database querying and data manipulation</li>
-                <li><strong>Python</strong> - Programming for data analysis and machine learning</li>
-                <li><strong>Data Analysis Models</strong> - Understanding various analytical frameworks</li>
-                <li><strong>Data Processing</strong> - ETL processes and data pipeline development</li>
-            </ul>
-            
-            <h4 style="color: #2e8b57; border-bottom: 2px solid #2e8b57; padding-bottom: 0.5rem;">
-                🔧 Skills Integration
-            </h4>
-            <div style="background: #f8f9fa; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid #ff6b6b;">
-                <p style="margin: 0; text-align: justify; line-height: 1.6;">
-                    <strong>Unique Value:</strong> Combines mechanical engineering expertise with 
-                    data science skills to bridge the gap between industrial operations and data-driven 
-                    decision making. This cross-disciplinary approach brings valuable insights to 
-                    data analysis projects.
-                </p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+### 👨‍🔧 Trương Văn Lê
+*Mechanical Engineer & Data Science Enthusiast*
+
+---
+#### 📞 Contact Information
+- **📧 Email:** truongvanle999@gmail.com
+- **💼 Current Role:** Mechanical Engineering
+
+---
+#### 🎯 Professional Background
+Currently working in the **mechanical engineering field**, bringing a unique perspective to data science through hands-on industrial experience and technical expertise.
+
+---
+#### 🎓 Why Data Science?
+> "Hiện tại mọi thứ đều xoay quanh data, nên mong muốn tìm hiểu về data và cách data hoạt động cũng như có thể ứng dụng vào trong cuộc sống cũng như công việc."
+>
+> *Translation: Currently everything revolves around data, so I want to learn about data and how data works as well as be able to apply it in life and work.*
+
+---
+#### 📚 Learning Outcomes
+Through this Data Science course, achieved proficiency in:
+- **SQL**: Database querying and data manipulation
+- **Python**: Programming for data analysis and machine learning
+- **Data Analysis Models**: Understanding various analytical frameworks
+- **Data Processing**: ETL processes and data pipeline development
+
+---
+#### 🔧 Technical Skills & Contributions
+**Programming:**
+- Python ⭐⭐⭐⭐
+- SQL ⭐⭐⭐⭐
+- Data Analysis ⭐⭐⭐⭐
+
+**Engineering Background:**
+- Mechanical Engineering
+- Industrial Process Understanding
+- Problem-Solving Approach
+
+> **Project Contributions:**
+> Applied engineering problem-solving methodology to data science challenges, contributing to the development of robust recommendation algorithms and ensuring practical implementation of machine learning models. Focused on bridging theoretical concepts with real-world applications.
+        """)
     
     # Project Information
     st.markdown("---")
