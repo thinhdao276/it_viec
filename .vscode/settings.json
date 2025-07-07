@@ -1,9 +1,28 @@
 {
+    "python.defaultInterpreterPath": "./.venv/bin/python",
+    "python.pythonPath": "./.venv/bin/python",
+    "python.terminal.activateEnvironment": true,
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    "python.analysis.autoImportCompletions": true,
     "python-envs.pythonProjects": [
         {
             "path": "",
             "envManager": "ms-python.python:venv",
             "packageManager": "ms-python.python:pip"
         }
-    ]
+    ],
+    "files.associations": {
+        "*.py": "python"
+    },
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.formatting.provider": "black",
+    "terminal.integrated.defaultProfile.linux": "bash",
+    "terminal.integrated.profiles.linux": {
+        "bash": {
+            "path": "bash",
+            "args": ["-c", "source .venv/bin/activate && exec bash"]
+        }
+    }
 }

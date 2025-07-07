@@ -14,7 +14,27 @@ from sklearn.feature_extraction.text import TfidfVectorizer, ENGLISH_STOP_WORDS
 from sklearn.metrics.pairwise import cosine_similarity
 from gensim import corpora, models, similarities
 import seaborn as sns
+
+
 warnings.filterwarnings('ignore')
+
+# Import company picker util
+from utils.company_selection import (
+    load_company_data_for_picker,
+    get_market_averages,
+    calculate_rating_gaps,
+    display_gap_analysis,
+    create_company_spider_chart,
+    make_prediction_with_model,
+    clean_recommendation_data,
+    create_enhanced_model_comparison_dashboard,
+    create_interactive_eda_dashboard,
+    create_about_authors_page
+)
+
+
+# Import load_trained_models from utils at the top
+from utils.recommendation_modeling import load_trained_models
 
 # Delayed import of joblib to avoid multiprocessing issues
 try:
@@ -293,7 +313,10 @@ def build_bert_model(df):
         if not ADVANCED_NLP_AVAILABLE:
             return None
         
-        # Load pre-trained BERT model
+        # Load pre-trained BERT model with SSL verification disabled
+        import ssl
+        ssl._create_default_https_context = ssl._create_unverified_context
+        
         model = SentenceTransformer('all-MiniLM-L6-v2')
         
         # Generate embeddings for all texts
@@ -301,7 +324,7 @@ def build_bert_model(df):
         
         return model, embeddings
     except Exception as e:
-        st.error(f"Error building BERT model: {e}")
+        st.warning(f"BERT model not available: {e}")
         return None, None
 
 def get_sklearn_recommendations(company_name, similarity_matrix, df, top_k=5):
@@ -1370,7 +1393,7 @@ def display_recommendation_modeling_page(df):
         return
     
     # Load trained models
-    models = load_trained_models()
+    models, model_metadata = load_trained_models()
     
     # Create tabs
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -1457,7 +1480,28 @@ def display_recommendation_modeling_page(df):
                         
                         # Store in session state
                         st.session_state.selected_company_info = company_info
+                        
+                        # Get ratings and store in session state for sliders
+                        overall = company_info.get('Rating', 3.7)
+                        salary = company_info.get('Salary & benefits', 3.6)
+                        culture = company_info.get('Culture & fun', 3.7)
+                        management = company_info.get('Management cares about me', 3.5)
+                        training = company_info.get('Training & learning', 3.5)
+                        office = company_info.get('Office & workspace', 3.6)
+                        
+                        # Auto-fill the manual input section
+                        st.session_state.auto_overall = overall
+                        st.session_state.auto_salary = salary
+                        st.session_state.auto_culture = culture
+                        st.session_state.auto_management = management
+                        st.session_state.auto_training = training
+                        st.session_state.auto_office = office
+                        st.session_state.auto_company_size = company_info.get('Company size', '101-500')
+                        st.session_state.auto_company_type = company_info.get('Company Type', 'Product')
+                        st.session_state.auto_overtime_policy = company_info.get('Overtime Policy', 'Flexible')
+                        
                         st.success(f"✅ Loaded data for {selected_company}")
+                        st.rerun()  # Force rerun to update the sliders
                 
                 # Display loaded company information
                 if 'selected_company_info' in st.session_state:
@@ -1471,7 +1515,9 @@ def display_recommendation_modeling_page(df):
                     with col1:
                         st.metric("Company", company_info['Company Name'])
                         if 'Company industry' in company_info:
-                            st.metric("Industry", str(company_info['Company industry'])[:30] + "...")
+                            industry_name = str(company_info['Company industry'])
+                            display_name = industry_name[:30] + "..." if len(industry_name) > 30 else industry_name
+                            st.metric("Industry", display_name)
                     
                     with col2:
                         if 'Company size' in company_info:
@@ -1482,25 +1528,6 @@ def display_recommendation_modeling_page(df):
                     with col3:
                         if 'Overtime Policy' in company_info:
                             st.metric("OT Policy", company_info['Overtime Policy'])
-                    
-                    # Get ratings
-                    overall = company_info.get('Rating', 3.7)
-                    salary = company_info.get('Salary & benefits', 3.6)
-                    culture = company_info.get('Culture & fun', 3.7)
-                    management = company_info.get('Management cares about me', 3.5)
-                    training = company_info.get('Training & learning', 3.5)
-                    office = company_info.get('Office & workspace', 3.6)
-                    
-                    # Auto-fill the manual input section
-                    st.session_state.auto_overall = overall
-                    st.session_state.auto_salary = salary
-                    st.session_state.auto_culture = culture
-                    st.session_state.auto_management = management
-                    st.session_state.auto_training = training
-                    st.session_state.auto_office = office
-                    st.session_state.auto_company_size = company_info.get('Company size', '101-500')
-                    st.session_state.auto_company_type = company_info.get('Company Type', 'Product')
-                    st.session_state.auto_overtime_policy = company_info.get('Overtime Policy', 'Flexible')
                     
             else:
                 st.warning("⚠️ Could not load company data. Please use manual input.")
@@ -1531,22 +1558,22 @@ def display_recommendation_modeling_page(df):
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            company_size = st.selectbox("Company Size", 
-                                      ["1-50", "51-100", "101-500", "501-1000", "1000+"],
-                                      index=2 if 'auto_company_size' not in st.session_state 
-                                      else ["1-50", "51-100", "101-500", "501-1000", "1000+"].index(st.session_state.get('auto_company_size', '101-500')))
+            size_options = ["1-50", "51-100", "101-500", "501-1000", "1000+"]
+            default_size = st.session_state.get('auto_company_size', '101-500')
+            size_index = size_options.index(default_size) if default_size in size_options else 2
+            company_size = st.selectbox("Company Size", size_options, index=size_index)
         
         with col2:
-            company_type = st.selectbox("Company Type", 
-                                      ["Product", "Outsourcing", "Service", "Startup"],
-                                      index=0 if 'auto_company_type' not in st.session_state
-                                      else ["Product", "Outsourcing", "Service", "Startup"].index(st.session_state.get('auto_company_type', 'Product')))
+            type_options = ["Product", "Outsourcing", "Service", "Startup"]
+            default_type = st.session_state.get('auto_company_type', 'Product')
+            type_index = type_options.index(default_type) if default_type in type_options else 0
+            company_type = st.selectbox("Company Type", type_options, index=type_index)
         
         with col3:
-            overtime_policy = st.selectbox("Overtime Policy", 
-                                         ["No OT", "Extra Salary", "Flexible", "Comp Time"],
-                                         index=2 if 'auto_overtime_policy' not in st.session_state
-                                         else ["No OT", "Extra Salary", "Flexible", "Comp Time"].index(st.session_state.get('auto_overtime_policy', 'Flexible')))
+            ot_options = ["No OT", "Extra Salary", "Flexible", "Comp Time"]
+            default_ot = st.session_state.get('auto_overtime_policy', 'Flexible')
+            ot_index = ot_options.index(default_ot) if default_ot in ot_options else 2
+            overtime_policy = st.selectbox("Overtime Policy", ot_options, index=ot_index)
         
         # Calculate gaps and make prediction
         if st.button("🔮 Predict Recommendation", type="primary", use_container_width=True):
@@ -1621,7 +1648,18 @@ def display_recommendation_modeling_page(df):
         display_model_performance_tab(models)
     
     with tab4:
-        display_company_eda_tab(rec_df)
+        st.markdown('<h3 class="tab-header">📊 Company Analysis</h3>', unsafe_allow_html=True)
+        
+        # Create sub-tabs for different analysis types
+        analysis_tab1, analysis_tab2 = st.tabs(["📈 Interactive EDA Dashboard", "🤖 Enhanced Model Comparison"])
+        
+        with analysis_tab1:
+            # Use the enhanced EDA dashboard
+            create_interactive_eda_dashboard(rec_df)
+        
+        with analysis_tab2:
+            # Use the enhanced model comparison dashboard
+            create_enhanced_model_comparison_dashboard(models, model_metadata)
 
 def display_model_performance_tab(models):
     """Display model performance comparison"""
@@ -1700,6 +1738,9 @@ def display_company_eda_tab(rec_df):
         st.error("❌ No data available for analysis")
         return
     
+    # Clean the data first
+    rec_df = clean_recommendation_data(rec_df)
+    
     # Basic data info
     st.markdown("### 📋 Dataset Overview")
     col1, col2, col3, col4 = st.columns(4)
@@ -1764,44 +1805,8 @@ def display_company_eda_tab(rec_df):
 
 
 def display_about_page():
-    """Display About page"""
-    st.markdown('<h2 class="section-header">ℹ️ About This Application</h2>', unsafe_allow_html=True)
-    
-    st.markdown("""
-    ### 🎯 Project Overview
-    This application implements two comprehensive recommendation systems for ITViec company analysis:
-    
-    #### **🔍 Content-Based Similarity System (Requirement 1)**
-    Find similar companies based on content description using multiple NLP approaches.
-    
-    #### **🎯 Recommendation Modeling System (Requirement 2)**  
-    Predict whether to recommend a company based on employee reviews and rating gaps.
-    
-    ### 🛠️ Technical Implementation
-    
-    #### **Content-Based Features:**
-    - **Data Sources**: Company overview, industry, key skills
-    - **Methods**: TF-IDF vectorization + Cosine similarity
-    - **Algorithms**: Scikit-learn & Gensim implementations
-    - **Advanced**: Doc2Vec, FastText, BERT embeddings
-    
-    #### **Recommendation Modeling Features:**  
-    - **Data Sources**: Employee reviews from final_data.xlsx
-    - **Innovation**: Rating Gap Analysis vs market average
-    - **Models**: Random Forest, LightGBM, CatBoost (90%+ accuracy)
-    - **Visualizations**: Spider charts, performance comparisons
-    
-    ### 🚀 Technology Stack
-    - **Frontend**: Streamlit
-    - **ML Libraries**: Scikit-learn, LightGBM, CatBoost
-    - **Data Processing**: Pandas, NumPy
-    - **Visualization**: Matplotlib, Plotly
-    
-    ### 👥 Team Information
-    - **Đào Tuấn Thịnh** - daotuanthinh@gmail.com
-    - **Trương Văn Lê** - truongvanle999@gmail.com
-    - **Instructor: Khuất Thị Phương**
-    """)
+    """Display About Authors page"""
+    create_about_authors_page()
 
 
 if __name__ == "__main__":
