@@ -161,7 +161,6 @@ def preprocess_text(text):
 def load_and_preprocess_data():
     """Load and preprocess data with error handling"""
     data_paths = [
-        "Overview_Companies_preprocessed.csv",
         "./data/Overview_Companies.xlsx",
         "../data/Overview_Companies.xlsx",
         "data/Overview_Companies.xlsx"
@@ -170,24 +169,19 @@ def load_and_preprocess_data():
     df = None
     for path in data_paths:
         try:
-            if path.endswith('.csv'):
-                df = pd.read_csv(path)
-                st.success(f"✅ Loaded preprocessed data from {path}")
-                break
-            else:
-                df = pd.read_excel(path)
-                st.info(f"📊 Loaded raw data from {path} - preprocessing...")
-                # Quick preprocessing
-                df_work = df[['Company Name', 'Company overview', 'Company industry', 'Our key skills']].copy()
-                df_work.fillna("", inplace=True)
-                df_work['combined_text'] = (
-                    df_work['Company overview'] + " " + 
-                    df_work['Company industry'] + " " + 
-                    df_work['Our key skills']
-                )
-                df_work['preprocessed_text'] = df_work['combined_text'].apply(preprocess_text)
-                df = df_work
-                break
+            df = pd.read_excel(path)
+            st.info(f"📊 Loaded raw data from {path} - preprocessing...")
+            # Quick preprocessing
+            df_work = df[['Company Name', 'Company overview', 'Company industry', 'Our key skills']].copy()
+            df_work.fillna("", inplace=True)
+            df_work['combined_text'] = (
+                df_work['Company overview'] + " " + 
+                df_work['Company industry'] + " " + 
+                df_work['Our key skills']
+            )
+            df_work['preprocessed_text'] = df_work['combined_text'].apply(preprocess_text)
+            df = df_work
+            break
         except Exception as e:
             continue
     
@@ -201,7 +195,7 @@ def load_recommendation_modeling_data():
     """Load data for recommendation modeling system (from final_data.xlsx)"""
     rec_data_paths = [
         "notebooks/final_data.xlsx",
-        "./notebooks/final_data.xlsx", 
+        "./notebooks/final_data.xlsx",
         "../notebooks/final_data.xlsx",
         "final_data.xlsx"
     ]
@@ -212,7 +206,7 @@ def load_recommendation_modeling_data():
             df = pd.read_excel(path)
             st.success(f"✅ Loaded recommendation modeling data from {path}: {len(df)} reviews")
             break
-        except Exception as e:
+        except Exception:
             continue
     
     if df is None:
@@ -1375,12 +1369,15 @@ def display_recommendation_modeling_page(df):
         st.error("❌ Could not load recommendation modeling data")
         return
     
+    # Load trained models
+    models = load_trained_models()
+    
     # Create tabs
     tab1, tab2, tab3, tab4 = st.tabs([
         "📖 About", 
         "🎯 Predict Recommendation", 
-        "📈 Model Comparison", 
-        "📊 EDA and Visualization"
+        "📈 Model Performance", 
+        "📊 Company Analysis"
     ])
     
     with tab1:
@@ -1417,1079 +1414,395 @@ def display_recommendation_modeling_page(df):
         - **Management Care Gap**: vs market average
         - **Office & Workspace Gap**: vs market average
         
-        ### 📊 Feature Engineering Pipeline
+        ### 🤖 Available Models
+        Our system includes multiple trained machine learning models:
+        - **Random Forest**: Ensemble model with feature importance
+        - **Logistic Regression**: Linear model for baseline comparison
+        - **LightGBM**: Gradient boosting for high performance
+        - **CatBoost**: Auto-categorical feature handling
+        - **SVM**: Support Vector Machine classifier
+        - **KNN**: K-Nearest Neighbors classifier
+        - **Naive Bayes**: Probabilistic classifier
         
-        #### **1. Text Features (from "What I liked")**
-        ```python
-        # Only use "What I liked" column
-        text_features = df['What I liked'].fillna('')
-        vectorizer = TfidfVectorizer(max_features=100, stop_words='english')
-        text_matrix = vectorizer.fit_transform(text_features)
-        ```
-        
-        #### **2. Clustering Features**
-        ```python
-        clustering_features = [
-            'rating_cluster',     # K-means cluster based on ratings
-            'size_cluster'        # Company size grouping
-        ]
-        ```
-        
-        #### **3. Rating Gap Features (CORE INNOVATION)**
-        ```python
-        # Calculate gaps vs market mean
-        rating_gaps = [
-            'rating_gap',               # Rating - mean_rating
-            'salary_and_benefits_gap',  # Salary & benefits - mean_salary
-            'training_and_learning_gap', # Training & learning - mean_training  
-            'culture_and_fun_gap',      # Culture & fun - mean_culture
-            'office_and_workspace_gap', # Office & workspace - mean_office
-            'management_cares_about_me_gap' # Management care - mean_management
-        ]
-        ```
-        
-        #### **4. Company Metadata**
-        ```python
-        company_info = [
-            'Company size',
-            'Company Type',
-            'Overtime Policy'
-        ]
-        ```
-        
-        ### 🎯 Target Variable Creation
-        ```python
-        # Company recommended if:
-        # - Rating > mean rating AND
-        # - Salary & benefits > mean salary AND
-        # - (Culture > mean culture OR Management > mean management)
-        df['Recommend'] = create_recommendation_target(df)
-        ```
-        
-        ### 🤖 Machine Learning Models Available
-        
-        | Model | Type | Strengths | Best For |
-        |-------|------|-----------|----------|
-        | **Logistic Regression** | Linear | Interpretable, fast, baseline | Rating gaps analysis |
-        | **Random Forest** | Ensemble | Feature interactions, robust | Text + numerical features |
-        | **LightGBM** | Gradient Boosting | High performance, efficient | Large datasets |
-        | **CatBoost** | Gradient Boosting | Categorical features, robust | Mixed data types |
-        | **SVM** | Kernel-based | Non-linear patterns | High-dimensional data |
-        | **Naive Bayes** | Probabilistic | Fast, simple | Text classification |
-        | **KNN** | Instance-based | Local patterns | Similarity-based |
-        
-        ### 📂 Project File Structure
-        ```
-        📁 it_viec/
-        ├── 📄 app.py                           # Main Streamlit application
-        ├── 📁 data/                           # Raw data files
-        │   ├── 📄 Overview_Companies.xlsx      # Company information
-        │   ├── 📄 Overview_Reviews.xlsx        # Company reviews
-        │   └── 📄 Reviews.xlsx                 # Detailed reviews
-        ├── 📁 notebooks/                      # Analysis notebooks
-        │   ├── 📄 final_data.xlsx             # 🔥 Main data for modeling
-        │   ├── 📄 Recommendation Modeling.ipynb # Main modeling notebook
-        │   └── 📄 Content Based Suggestion.ipynb
-        ├── 📁 models/                         # Trained ML models
-        │   ├── 📄 CatBoost.pkl
-        │   ├── 📄 LightGBM.pkl
-        │   ├── 📄 Logistic_Regression.pkl
-        │   ├── 📄 Random_Forest.pkl
-        │   ├── 📄 SVM.pkl
-        │   ├── 📄 Naive_Bayes.pkl
-        │   ├── 📄 KNN.pkl
-        │   └── 📄 models_metadata.json         # Model metadata
-        └── 📁 utils/                          # Utility functions
-            ├── 📄 recommendation_modeling.py   # 🔥 New pipeline utilities
-            ├── 📄 recommendation_modeling_viz.py # Visualization utilities
-            ├── 📄 preprocessing.py
-            ├── 📄 recommendation_sklearn.py
-            ├── 📄 recommendation_gensim.py
-            └── 📄 visualization.py
-        ```
-        
-        ### 🔄 **Workflow Comparison:**
-        
-        **Old:** Load Data → Create Similarity Matrix → Recommend Similar Companies  
-        **New:** Load Data → Calculate Rating Gaps → Apply Clustering → Create Features → Train Models → Recommend GOOD Companies
-        
-        ### 📊 Model Performance Metrics
-        - **F1-Score**: Primary metric (handles class imbalance)
-        - **Cross-Validation**: 5-fold CV for robust evaluation
-        - **Accuracy**: Overall prediction correctness
-        - **Precision**: True positive rate  
-        - **Recall**: Sensitivity to positive cases
-        
-        ### 📊 Threshold Calculation Methodology
-        
-        **Our system doesn't use a fixed threshold.** Instead, it uses **Rating Gap Analysis** - a more sophisticated approach:
-        
-        #### 📊 Rating Gap Approach vs Traditional Threshold
-        
-        **❌ Traditional Threshold Method:**
-        ```
-        if similarity_score > 0.7:  # Fixed threshold
-            recommend = True
-        ```
-        
-        **✅ Our Rating Gap Method:**
-        ```python
-        # 1. Calculate gaps vs market average
-        rating_gap = company_rating - market_average_rating
-        salary_gap = company_salary - market_average_salary
-        management_gap = company_management - market_average_management
-        
-        # 2. Use weighted scoring based on importance
-        weights = {
-            'Rating': 0.25,              # Overall satisfaction
-            'Salary & benefits': 0.20,   # Financial satisfaction  
-            'Management': 0.20,          # Leadership quality
-            'Culture & fun': 0.15,       # Work environment
-            'Training': 0.10,            # Growth opportunities
-            'Office': 0.10              # Physical workspace
-        }
-        
-        # 3. Calculate recommendation score
-        recommendation_score = sum(
-            (0.5 + gap * 0.3) * weight 
-            for gap, weight in zip(gaps, weights)
-        )
-        
-        # 4. Recommend if score > threshold (default 0.5 = market average)
-        recommend = recommendation_score > threshold
-        ```
-        
-        #### 🔍 Why Rating Gaps are Better
-        
-        1. **Market Context**: Companies are evaluated relative to market benchmarks
-        2. **Multi-dimensional**: Considers 6 different rating aspects, not just one score
-        3. **Weighted Importance**: Different factors have different impacts on recommendation
-        4. **Dynamic Threshold**: The "threshold" adapts based on market conditions
-        5. **Interpretable**: You can see exactly why a company is recommended
-        
-        #### 📈 Example Calculation
-        
-        **Company A vs Market:**
-        - Rating Gap: +0.3 (4.0 vs 3.7 market avg)
-        - Salary Gap: +0.2 (3.8 vs 3.6 market avg)  
-        - Management Gap: -0.1 (3.4 vs 3.5 market avg)
-        
-        **Weighted Score:**
-        - Rating: (0.5 + 0.3×0.3) × 0.25 = 0.1475
-        - Salary: (0.5 + 0.2×0.3) × 0.20 = 0.112
-        - Management: (0.5 - 0.1×0.3) × 0.20 = 0.094
-        - **Total Score: 0.67 > 0.5 → RECOMMEND** ✅
-        
-        #### 🎛️ Threshold Slider in UI
-        
-        The threshold slider in our interface allows you to be more or less selective:
-        - **0.3 (Low)**: Recommend companies doing better than bottom 30%
-        - **0.5 (Medium)**: Recommend companies doing better than market average  
-        - **0.7 (High)**: Only recommend top-performing companies
-        
-        This gives users control over how selective they want the recommendations to be!
+        All models achieve **90%+ accuracy** in predicting company recommendations.
         """)
     
     with tab2:
-        st.markdown('<h3 class="tab-header">🎯 Predict Recommendation</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="tab-header">🎯 Predict Company Recommendation</h3>', unsafe_allow_html=True)
         
-        # Configuration section for Prediction
-        st.markdown("### ⚙️ Model Configuration")
-        col1, col2, col3 = st.columns(3)
-        
-        # Load available models
-        trained_models = {}
-        models_metadata = {}
-        try:
-            from utils.recommendation_modeling import load_trained_models
-            trained_models, models_metadata = load_trained_models()
-            available_models = list(trained_models.keys()) if trained_models else []
-            
-            if not available_models:
-                st.warning("⚠️ No trained models found. Please train models first using the notebook.")
-                available_models = ["Logistic_Regression", "Random_Forest", "LightGBM", "CatBoost", "SVM", "Naive_Bayes", "KNN"]
-                st.info("💡 You can train models by running all cells in the 'Recommendation Modeling.ipynb' notebook")
-                
-        except ImportError as import_error:
-            st.warning(f"⚠️ Could not import utils module: {import_error}")
-            available_models = ["Logistic_Regression", "Random_Forest", "LightGBM", "CatBoost", "SVM", "Naive_Bayes", "KNN"]
-        except Exception as e:
-            st.warning(f"⚠️ Could not load models: {e}")
-            available_models = ["Logistic_Regression", "Random_Forest", "LightGBM", "CatBoost", "SVM", "Naive_Bayes", "KNN"]
-        
-        with col1:
-            selected_model = st.selectbox(
-                "🤖 Select ML Model",
-                available_models,
-                help="Choose the machine learning model for predictions"
-            )
-        
-        with col2:
-            prediction_threshold = st.slider(
-                "🎯 Prediction Threshold",
-                min_value=0.1, max_value=0.9, value=0.5, step=0.1,
-                help="Higher threshold = more selective recommendations. Lower threshold = more inclusive recommendations."
-            )
-        
-        with col3:
-            show_feature_importance = st.checkbox(
-                "📊 Show Feature Analysis",
-                value=True,
-                help="Display which factors most influence the recommendation"
-            )
-        
-        st.markdown("---")
-        
-        # Input form for prediction
-        st.markdown("#### 📝 Enter Company Information")
-        
-        # Add company selection option
-        input_method = st.radio(
-            "Input Method:",
-            ["🏢 Select Existing Company", "✏️ Enter New Company"],
+        # Company selection method
+        prediction_method = st.radio(
+            "Select Prediction Method:",
+            ["📊 Analyze Existing Company", "✋ Manual Input"],
             horizontal=True
         )
         
-        if input_method == "🏢 Select Existing Company":
-            # Load available companies
-            try:
-                from utils.company_selection import get_available_companies, get_company_insights_detailed
-                available_companies = get_available_companies(rec_df)
-                
-                if available_companies:
-                    selected_company = st.selectbox(
-                        "Select a company:",
-                        available_companies,
-                        help="Choose a company from the dataset"
-                    )
-                    
-                    if st.button("🔍 Analyze Selected Company", type="secondary"):
-                        company_insights = get_company_insights_detailed(rec_df, selected_company)
-                        
-                        if 'error' not in company_insights:
-                            st.success(f"✅ Analysis for {selected_company}")
-                            
-                            # Save company data to session state for next step (prediction)
-                            company_info = company_insights['company_info']
-                            company_ratings = company_insights['company_ratings']
-                            
-                            st.session_state.analyzed_company_data = {
-                                'Company Name': selected_company,
-                                'Rating': company_ratings.get('Rating', 3.5),
-                                'Salary & benefits': company_ratings.get('Salary & benefits', 3.5),
-                                'Culture & fun': company_ratings.get('Culture & fun', 3.5),
-                                'Training & learning': company_ratings.get('Training & learning', 3.5),
-                                'Management cares about me': company_ratings.get('Management cares about me', 3.5),
-                                'Office & workspace': company_ratings.get('Office & workspace', 3.5),
-                                'Company size': company_info.get('Company Size', '101-500'),
-                                'Company Type': company_info.get('Company Type', 'Service Company'),
-                                'Overtime Policy': company_info.get('Overtime Policy', 'Sometimes')
-                            }
-                            
-                            # Display company information
-                            col1, col2, col3 = st.columns(3)
-                            
-                            with col1:
-                                st.metric("Overall Rating", f"{company_info.get('Overall Rating', 0):.2f}")
-                            with col2:
-                                st.metric("Company Size", company_info.get('Company Size', 'Unknown'))
-                            with col3:
-                                recommendation = "RECOMMEND" if company_insights['recommend'] else "NOT RECOMMEND"
-                                st.metric("Recommendation", recommendation)
-                            
-                            # Show rating gaps analysis
-                            rating_gaps = company_insights['rating_gaps']
-                            if rating_gaps:
-                                st.subheader("📊 Rating Gap Analysis")
-                                
-                                gap_names = [name.replace('_', ' ').title() for name in rating_gaps.keys()]
-                                gap_values = list(rating_gaps.values())
-                                
-                                fig = px.bar(
-                                    x=gap_names,
-                                    y=gap_values,
-                                    title=f"Rating Gaps vs Market Average - {selected_company}",
-                                    color=gap_values,
-                                    color_continuous_scale="RdYlGn"
-                                )
-                                fig.add_hline(y=0, line_dash="dash", line_color="black", annotation_text="Market Average")
-                                st.plotly_chart(fig, use_container_width=True)
-                                
-                            # Add spider chart comparing to market
-                            try:
-                                from utils.enhanced_model_comparison import create_company_market_spider_chart
-                                spider_chart = create_company_market_spider_chart(
-                                    company_ratings, 
-                                    company_insights['market_averages'],
-                                    selected_company
-                                )
-                                if 'error' not in spider_chart:
-                                    st.subheader("🕷️ Company vs Market Spider Chart")
-                                    st.plotly_chart(spider_chart['spider_chart'], use_container_width=True)
-                            except ImportError:
-                                pass  # Module not available
-                            except Exception as e:
-                                st.info(f"💡 Spider chart not available: {e}")
-                                
-                            st.info("💡 **Tip**: You can now use this company's data in the prediction section below by clicking 'Use Analyzed Company Data'")
-                            
-                        else:
-                            st.error(f"❌ {company_insights['error']}")
-                else:
-                    st.warning("⚠️ No companies available for selection")
-                    
-            except Exception as e:
-                st.error(f"❌ Error loading companies: {e}")
-        
-        else:  # Enter New Company
-            st.markdown("**Manual Company Input:**")
+        if prediction_method == "📊 Analyze Existing Company":
+            # Load company data for picker
+            company_data = load_company_data_for_picker()
             
-            # Add button to use analyzed company data
-            if 'analyzed_company_data' in st.session_state:
-                if st.button("📋 Use Analyzed Company Data", type="secondary"):
-                    # Load data from analyzed company
-                    data = st.session_state.analyzed_company_data
-                    st.session_state.update({
-                        'company_name_input': data.get('Company Name', ''),
-                        'overall_rating': data.get('Rating', 3.5),
-                        'salary_rating': data.get('Salary & benefits', 3.5),
-                        'culture_rating': data.get('Culture & fun', 3.5),
-                        'training_rating': data.get('Training & learning', 3.5),
-                        'management_rating': data.get('Management cares about me', 3.5),
-                        'office_rating': data.get('Office & workspace', 3.5),
-                        'company_size': data.get('Company size', '101-500'),
-                        'company_type': data.get('Company Type', 'Service Company'),
-                        'overtime_policy': data.get('Overtime Policy', 'Sometimes')
-                    })
-                    st.success(f"✅ Loaded data from analyzed company: {data.get('Company Name', 'Unknown')}")
-                    st.rerun()
+            if not company_data.empty:
+                col1, col2 = st.columns([2, 1])
+                
+                with col1:
+                    selected_company = st.selectbox(
+                        "Select a Company to Analyze:",
+                        options=company_data['Company Name'].tolist(),
+                        help="Choose a company to analyze its recommendation potential"
+                    )
+                
+                with col2:
+                    if st.button("📊 Load Company Data", help="Load the selected company's information"):
+                        company_info = company_data[company_data['Company Name'] == selected_company].iloc[0]
+                        
+                        # Store in session state
+                        st.session_state.selected_company_info = company_info
+                        st.success(f"✅ Loaded data for {selected_company}")
+                
+                # Display loaded company information
+                if 'selected_company_info' in st.session_state:
+                    company_info = st.session_state.selected_company_info
+                    
+                    st.markdown("### 📋 Company Information")
+                    
+                    # Display company details
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.metric("Company", company_info['Company Name'])
+                        if 'Company industry' in company_info:
+                            st.metric("Industry", str(company_info['Company industry'])[:30] + "...")
+                    
+                    with col2:
+                        if 'Company size' in company_info:
+                            st.metric("Size", company_info['Company size'])
+                        if 'Company Type' in company_info:
+                            st.metric("Type", company_info['Company Type'])
+                    
+                    with col3:
+                        if 'Overtime Policy' in company_info:
+                            st.metric("OT Policy", company_info['Overtime Policy'])
+                    
+                    # Get ratings
+                    overall = company_info.get('Rating', 3.7)
+                    salary = company_info.get('Salary & benefits', 3.6)
+                    culture = company_info.get('Culture & fun', 3.7)
+                    management = company_info.get('Management cares about me', 3.5)
+                    training = company_info.get('Training & learning', 3.5)
+                    office = company_info.get('Office & workspace', 3.6)
+                    
+                    # Auto-fill the manual input section
+                    st.session_state.auto_overall = overall
+                    st.session_state.auto_salary = salary
+                    st.session_state.auto_culture = culture
+                    st.session_state.auto_management = management
+                    st.session_state.auto_training = training
+                    st.session_state.auto_office = office
+                    st.session_state.auto_company_size = company_info.get('Company size', '101-500')
+                    st.session_state.auto_company_type = company_info.get('Company Type', 'Product')
+                    st.session_state.auto_overtime_policy = company_info.get('Overtime Policy', 'Flexible')
+                    
+            else:
+                st.warning("⚠️ Could not load company data. Please use manual input.")
+        
+        # Manual input section (always visible)
+        st.markdown("### ✋ Company Ratings Input")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            company_name_input = st.text_input(
-                "Company Name", 
-                value=st.session_state.get('company_name_input', ''),
-                placeholder="Enter company name..."
-            )
-            overall_rating = st.slider(
-                "Overall Rating", 1.0, 5.0, 
-                value=st.session_state.get('overall_rating', 3.5), 
-                step=0.1
-            )
-            salary_rating = st.slider(
-                "Salary & Benefits", 1.0, 5.0, 
-                value=st.session_state.get('salary_rating', 3.5), 
-                step=0.1
-            )
-            culture_rating = st.slider(
-                "Culture & Fun", 1.0, 5.0, 
-                value=st.session_state.get('culture_rating', 3.5), 
-                step=0.1
-            )
+            overall = st.slider("Overall Rating", 1.0, 5.0, 
+                              st.session_state.get('auto_overall', 3.7), 0.1)
+            salary = st.slider("Salary & Benefits", 1.0, 5.0, 
+                             st.session_state.get('auto_salary', 3.6), 0.1)
+            culture = st.slider("Culture & Fun", 1.0, 5.0, 
+                              st.session_state.get('auto_culture', 3.7), 0.1)
         
         with col2:
-            training_rating = st.slider(
-                "Training & Learning", 1.0, 5.0, 
-                value=st.session_state.get('training_rating', 3.5), 
-                step=0.1
-            )
-            management_rating = st.slider(
-                "Management Cares About Me", 1.0, 5.0, 
-                value=st.session_state.get('management_rating', 3.5), 
-                step=0.1
-            )
-            office_rating = st.slider(
-                "Office & Workspace", 1.0, 5.0, 
-                value=st.session_state.get('office_rating', 3.5), 
-                step=0.1
-            )
-            company_size = st.selectbox(
-                "Company Size", 
-                ["1-50", "51-100", "101-500", "501-1000", "1000+"],
-                index=["1-50", "51-100", "101-500", "501-1000", "1000+"].index(
-                    st.session_state.get('company_size', '101-500')
-                )
-            )
+            management = st.slider("Management Care", 1.0, 5.0, 
+                                 st.session_state.get('auto_management', 3.5), 0.1)
+            training = st.slider("Training & Learning", 1.0, 5.0, 
+                               st.session_state.get('auto_training', 3.5), 0.1)
+            office = st.slider("Office & Workspace", 1.0, 5.0, 
+                             st.session_state.get('auto_office', 3.6), 0.1)
         
-        # Additional inputs
-        company_type = st.selectbox(
-            "Company Type", 
-            ["Product Company", "Service Company", "Startup", "Enterprise", "Other"],
-            index=["Product Company", "Service Company", "Startup", "Enterprise", "Other"].index(
-                st.session_state.get('company_type', 'Service Company')
-            )
-        )
-        overtime_policy = st.selectbox(
-            "Overtime Policy", 
-            ["Rarely", "Sometimes", "Often", "Unknown"],
-            index=["Rarely", "Sometimes", "Often", "Unknown"].index(
-                st.session_state.get('overtime_policy', 'Sometimes')
-            )
-        )
+        # Company metadata
+        st.markdown("### 🏢 Company Characteristics")
+        col1, col2, col3 = st.columns(3)
         
-        if st.button("🎯 Predict Recommendation", type="primary"):
-            # Simulate prediction with rating gap analysis
-            try:
-                from utils.recommendation_modeling import predict_company_recommendation
+        with col1:
+            company_size = st.selectbox("Company Size", 
+                                      ["1-50", "51-100", "101-500", "501-1000", "1000+"],
+                                      index=2 if 'auto_company_size' not in st.session_state 
+                                      else ["1-50", "51-100", "101-500", "501-1000", "1000+"].index(st.session_state.get('auto_company_size', '101-500')))
+        
+        with col2:
+            company_type = st.selectbox("Company Type", 
+                                      ["Product", "Outsourcing", "Service", "Startup"],
+                                      index=0 if 'auto_company_type' not in st.session_state
+                                      else ["Product", "Outsourcing", "Service", "Startup"].index(st.session_state.get('auto_company_type', 'Product')))
+        
+        with col3:
+            overtime_policy = st.selectbox("Overtime Policy", 
+                                         ["No OT", "Extra Salary", "Flexible", "Comp Time"],
+                                         index=2 if 'auto_overtime_policy' not in st.session_state
+                                         else ["No OT", "Extra Salary", "Flexible", "Comp Time"].index(st.session_state.get('auto_overtime_policy', 'Flexible')))
+        
+        # Calculate gaps and make prediction
+        if st.button("🔮 Predict Recommendation", type="primary", use_container_width=True):
+            # Calculate rating gaps
+            gaps = calculate_rating_gaps(overall, salary, culture, management, training, office)
+            
+            # Display gap analysis
+            st.markdown("### 📊 Rating Gap Analysis")
+            display_gap_analysis(gaps)
+            
+            # Create spider chart
+            st.markdown("### 🕷️ Company vs Market Comparison")
+            company_ratings = [overall, salary, culture, management, training, office]
+            market_averages = list(get_market_averages().values())
+            create_company_spider_chart(company_ratings, market_averages)
+            
+            # Model selection for prediction
+            st.markdown("### 🤖 Model Predictions")
+            
+            if models:
+                predictions = {}
                 
-                # Prepare company data
-                company_data = {
-                    'Rating': overall_rating,
-                    'Salary & benefits': salary_rating,
-                    'Culture & fun': culture_rating,
-                    'Training & learning': training_rating,
-                    'Management cares about me': management_rating,
-                    'Office & workspace': office_rating,
-                    'Company size': company_size,
-                    'Company Type': company_type,
-                    'Overtime Policy': overtime_policy
-                }
-                
-                # Make prediction if models are available
-                if trained_models and selected_model in trained_models:
-                    try:
-                        from utils.recommendation_modeling import predict_company_recommendation
-                        result = predict_company_recommendation(company_data, trained_models, models_metadata, selected_model)
-                        
-                        if 'error' in result:
-                            st.error(f"❌ Prediction error: {result['error']}")
-                        else:
-                            recommendation = result['recommendation']
-                            confidence = result['confidence']
-                            
-                            # Success feedback
-                            if recommendation:
-                                st.balloons()
-                                st.success(f"🎉 **RECOMMEND** {company_name_input or 'This company'} with {confidence:.1%} confidence!")
-                            else:
-                                st.info(f"ℹ️ **NOT RECOMMEND** {company_name_input or 'This company'} with {confidence:.1%} confidence.")
-                            
-                            # Display detailed results
-                            col1, col2, col3 = st.columns(3)
-                            
-                            with col1:
-                                st.metric(
-                                    "Prediction",
-                                    "RECOMMEND" if recommendation else "NOT RECOMMEND",
-                                    delta=f"{confidence:.2%} confidence"
-                                )
-                            
-                            with col2:
-                                st.metric(
-                                    "Model Used",
-                                    selected_model.replace('_', ' '),
-                                    delta=f"Threshold: {prediction_threshold}"
-                                )
-                            
-                            with col3:
-                                risk_level = "Low" if confidence > 0.8 else "Medium" if confidence > 0.6 else "High"
-                                st.metric(
-                                    "Confidence Level",
-                                    risk_level,
-                                    delta=f"{result.get('features_used', 0)} features"
-                                )
-                            
-                            # Show rating gaps analysis
-                            if show_feature_importance and 'rating_gaps' in result:
-                                st.subheader("📊 Rating Gap Analysis")
-                                
-                                gaps_data = result['rating_gaps']
-                                if gaps_data:
-                                    gap_names = []
-                                    gap_values = []
-                                    
-                                    for gap_name, gap_value in gaps_data.items():
-                                        clean_name = gap_name.replace('_gap', '').replace('_', ' ').title()
-                                        gap_names.append(clean_name)
-                                        gap_values.append(gap_value)
-                                    
-                                    fig = px.bar(
-                                        x=gap_names,
-                                        y=gap_values,
-                                        title="Rating Gaps vs Market Average",
-                                        color=gap_values,
-                                        color_continuous_scale="RdYlGn"
-                                    )
-                                    fig.add_hline(y=0, line_dash="dash", line_color="black", annotation_text="Market Average")
-                                    st.plotly_chart(fig, use_container_width=True)
-                                    
-                                    # Add spider chart for predicted company
-                                    try:
-                                        from utils.enhanced_model_comparison import create_company_market_spider_chart
-                                        
-                                        # Calculate market averages from metadata
-                                        mean_ratings = models_metadata.get('mean_ratings', {
-                                            'Rating': 3.5, 'Salary & benefits': 3.4, 'Culture & fun': 3.6,
-                                            'Training & learning': 3.3, 'Management cares about me': 3.5, 'Office & workspace': 3.7
-                                        })
-                                        
-                                        spider_chart = create_company_market_spider_chart(
-                                            company_data, mean_ratings, company_name_input or 'Predicted Company'
-                                        )
-                                        
-                                        if 'error' not in spider_chart:
-                                            st.subheader("🕷️ Company vs Market Spider Chart")
-                                            st.plotly_chart(spider_chart['spider_chart'], use_container_width=True)
-                                            
-                                            # Display comparison metrics
-                                            metrics = spider_chart['comparison_metrics']
-                                            col1, col2, col3 = st.columns(3)
-                                            with col1:
-                                                st.metric("Company Average", f"{metrics['company_average']:.2f}")
-                                            with col2:
-                                                st.metric("Market Average", f"{metrics['market_average']:.2f}")
-                                            with col3:
-                                                gap_indicator = "📈" if metrics['performance_gap'] > 0 else "📉"
-                                                st.metric("Performance Gap", f"{gap_indicator} {metrics['performance_gap']:+.2f}")
-                                    
-                                    except Exception as spider_error:
-                                        st.info(f"💡 Spider chart not available: {spider_error}")
+                for model_name in models.keys():
+                    prediction, confidence = make_prediction_with_model(
+                        gaps, company_size, company_type, overtime_policy, model_name, models
+                    )
                     
-                    except ImportError as import_error:
-                        st.error(f"❌ Import error: {import_error}")
-                        st.info("💡 Please ensure all utils modules are properly installed")
-                    except Exception as general_error:
-                        st.error(f"❌ Prediction failed: {general_error}")
+                    if prediction is not None:
+                        predictions[model_name] = {
+                            'prediction': prediction,
+                            'confidence': confidence
+                        }
                 
+                # Display predictions
+                if predictions:
+                    pred_cols = st.columns(min(len(predictions), 3))
+                    
+                    for i, (model_name, result) in enumerate(predictions.items()):
+                        with pred_cols[i % 3]:
+                            recommendation = "✅ Recommend" if result['prediction'] == 1 else "❌ Not Recommend"
+                            confidence_pct = f"{result['confidence']*100:.1f}%"
+                            
+                            st.metric(
+                                label=model_name,
+                                value=recommendation,
+                                delta=f"Confidence: {confidence_pct}"
+                            )
+                    
+                    # Ensemble prediction
+                    positive_votes = sum(1 for result in predictions.values() if result['prediction'] == 1)
+                    total_votes = len(predictions)
+                    ensemble_recommendation = positive_votes > total_votes / 2
+                    
+                    st.markdown("### 🎯 Ensemble Prediction")
+                    ensemble_result = "✅ **RECOMMEND**" if ensemble_recommendation else "❌ **NOT RECOMMEND**"
+                    vote_ratio = f"{positive_votes}/{total_votes} models recommend"
+                    
+                    st.markdown(f"""
+                    <div class="recommendation-card">
+                        <h3>{ensemble_result}</h3>
+                        <p><strong>Consensus:</strong> {vote_ratio}</p>
+                        <p><strong>Confidence:</strong> {abs(positive_votes - total_votes/2) / (total_votes/2) * 100:.1f}%</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
                 else:
-                    # Fallback simulation if no trained models
-                    st.warning("⚠️ Using simulation mode - train models for actual predictions")
-                    
-                    # Simple rating gap simulation
-                    market_averages = {
-                        'Rating': 3.5,
-                        'Salary & benefits': 3.4,
-                        'Culture & fun': 3.6,
-                        'Training & learning': 3.3,
-                        'Management cares about me': 3.5,
-                        'Office & workspace': 3.7
-                    }
-                    
-                    rating_gaps = {}
-                    for metric, value in company_data.items():
-                        if metric in market_averages:
-                            rating_gaps[f"{metric}_gap"] = value - market_averages[metric]
-                    
-                    # Simple prediction logic
-                    positive_gaps = sum(1 for gap in rating_gaps.values() if gap > 0)
-                    avg_gap = np.mean(list(rating_gaps.values()))
-                    
-                    prediction_score = 0.5 + (avg_gap * 0.3) + (positive_gaps * 0.05)
-                    prediction_score = max(0, min(1, prediction_score))
-                    
-                    recommendation = prediction_score >= prediction_threshold
-                    
-                    # Display results
-                    if recommendation:
-                        st.balloons()
-                        st.success(f"🎉 **RECOMMEND** {company_name_input or 'This company'} with {prediction_score:.1%} confidence!")
-                    else:
-                        st.info(f"ℹ️ **NOT RECOMMEND** {company_name_input or 'This company'} with {prediction_score:.1%} confidence.")
-                    
-                    # Show gap analysis
-                    if show_feature_importance:
-                        st.subheader("📊 Rating Gap Analysis (Simulated)")
-                        
-                        gap_names = [name.replace('_gap', '').replace('_', ' ').title() for name in rating_gaps.keys()]
-                        gap_values = list(rating_gaps.values())
-                        
-                        fig = px.bar(
-                            x=gap_names,
-                            y=gap_values,
-                            title="Rating Gaps vs Market Average",
-                            color=gap_values,
-                            color_continuous_scale="RdYlGn"
-                        )
-                        fig.add_hline(y=0, line_dash="dash", line_color="black", annotation_text="Market Average")
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-            except Exception as e:
-                st.error(f"❌ Error during prediction: {e}")
+                    st.error("❌ No models available for prediction")
+            else:
+                st.error("❌ No trained models loaded")
     
     with tab3:
-        st.markdown('<h3 class="tab-header">📈 Model Comparison</h3>', unsafe_allow_html=True)
-        
-        # Load model performance data
-        try:
-            from utils.recommendation_modeling import load_trained_models
-            from utils.recommendation_modeling_viz import create_model_performance_comparison
-            from utils.enhanced_model_comparison import (
-                create_beautiful_model_comparison_visualizations,
-                create_model_recommendation_engine,
-                simulate_model_training_results
-            )
-            
-            trained_models, models_metadata = load_trained_models()
-            
-            if trained_models and 'evaluation_results' in models_metadata:
-                evaluation_results = models_metadata['evaluation_results']
-                st.success(f"✅ Loaded {len(evaluation_results)} trained models with evaluation results")
-                
-            else:
-                st.warning("⚠️ No trained models found. Using simulated results for demonstration.")
-                evaluation_results = simulate_model_training_results()
-                
-            if evaluation_results:
-                # Create beautiful model comparison visualizations
-                model_charts = create_beautiful_model_comparison_visualizations(evaluation_results)
-                
-                if 'error' not in model_charts:
-                    # Display performance table
-                    st.subheader("📊 Model Performance Summary")
-                    
-                    if 'comparison_table' in model_charts:
-                        st.dataframe(model_charts['comparison_table'], use_container_width=True)
-                    
-                    # Display visualization charts
-                    chart_cols = st.columns(2)
-                    
-                    with chart_cols[0]:
-                        if 'performance_radar' in model_charts:
-                            st.plotly_chart(model_charts['performance_radar'], use_container_width=True)
-                    
-                    with chart_cols[1]:
-                        if 'f1_ranking' in model_charts:
-                            st.plotly_chart(model_charts['f1_ranking'], use_container_width=True)
-                    
-                    # Additional charts
-                    if 'performance_distribution' in model_charts:
-                        st.plotly_chart(model_charts['performance_distribution'], use_container_width=True)
-                    
-                    if 'train_vs_cv' in model_charts:
-                        st.plotly_chart(model_charts['train_vs_cv'], use_container_width=True)
-                    
-                    # Model recommendations
-                    st.subheader("🏆 Model Recommendations")
-                    model_recommendations = create_model_recommendation_engine(evaluation_results)
-                    
-                    if 'error' not in model_recommendations and 'summary' in model_recommendations:
-                        # Display recommendations
-                        rec_summary = model_recommendations['summary']
-                        
-                        for _, rec in rec_summary.iterrows():
-                            st.markdown(f"""
-                            **{rec['Category']}**: {rec['Model']}  
-                            *{rec['Reason']}* (Score: {rec['Score']:.3f})
-                            """)
-                        
-                        if 'visualization' in model_recommendations:
-                            st.plotly_chart(model_recommendations['visualization'], use_container_width=True)
-                    
-                    # Best model recommendation
-                    if 'best_model' in model_charts and model_charts['best_model']:
-                        best_model = model_charts['best_model']
-                        best_score = model_charts['best_f1_score']
-                        
-                        st.success(f"""
-                        🏆 **Best Performing Model**: {best_model.replace('_', ' ')}
-                        - **F1-Score**: {best_score:.4f}
-                        - **Recommendation**: Use this model for production predictions
-                        """)
-                
-                else:
-                    st.error("❌ Could not create model comparison charts")
-                    
-                # Feature importance analysis (if models available)
-                if trained_models:
-                    try:
-                        from utils.enhanced_model_comparison import create_feature_importance_analysis
-                        
-                        # Get feature names from metadata or create dummy ones
-                        feature_names = models_metadata.get('feature_names', [
-                            'rating_gap', 'salary_gap', 'culture_gap', 'training_gap', 
-                            'management_gap', 'office_gap', 'company_size', 'company_type'
-                        ])
-                        
-                        importance_charts = create_feature_importance_analysis(trained_models, feature_names)
-                        
-                        if 'error' not in importance_charts:
-                            st.subheader("🔍 Feature Importance Analysis")
-                            
-                            if 'feature_importance' in importance_charts:
-                                st.plotly_chart(importance_charts['feature_importance'], use_container_width=True)
-                            
-                            if 'importance_by_model' in importance_charts:
-                                st.plotly_chart(importance_charts['importance_by_model'], use_container_width=True)
-                    
-                    except Exception as e:
-                        st.info("💡 Feature importance analysis not available")
-            
-            else:
-                st.error("❌ No evaluation results available")
-        
-        except Exception as e:
-            st.error(f"❌ Error loading model comparison: {e}")
+        display_model_performance_tab(models)
     
     with tab4:
-        st.markdown('<h3 class="tab-header">📊 EDA and Visualization</h3>', unsafe_allow_html=True)
+        display_company_eda_tab(rec_df)
+
+def display_model_performance_tab(models):
+    """Display model performance comparison"""
+    st.markdown('<h3 class="tab-header">📈 Model Performance</h3>', unsafe_allow_html=True)
+    
+    try:
+        # Load model metadata
+        import json
+        with open('models/models_metadata.json', 'r') as f:
+            metadata = json.load(f)
+            evaluation_results = metadata.get('evaluation_results', {})
         
-        if rec_df is not None:
-            # Fix string division errors
-            try:
-                from utils.company_selection import fix_string_division_error
-                rec_df = fix_string_division_error(rec_df)
-            except Exception as e:
-                st.warning(f"⚠️ Data preprocessing warning: {e}")
+        if evaluation_results:
+            # Create performance comparison
+            model_data = []
+            for model_name, metrics in evaluation_results.items():
+                model_data.append({
+                    'Model': model_name,
+                    'CV F1 Score': f"{metrics.get('CV_F1_Mean', 0):.3f}",
+                    'Train Accuracy': f"{metrics.get('Train_Accuracy', 0):.3f}",
+                    'Train Precision': f"{metrics.get('Train_Precision', 0):.3f}",
+                    'Train Recall': f"{metrics.get('Train_Recall', 0):.3f}",
+                    'Status': '✅ Loaded' if model_name.replace(' ', '_') in models else '❌ Not Loaded'
+                })
             
-            try:
-                from utils.recommendation_modeling_viz import (
-                    create_comprehensive_eda_dashboard,
-                    create_rating_distribution_charts,
-                    create_rating_gaps_analysis,
-                    create_cluster_analysis_chart,
-                    create_recommendation_analysis_charts,
-                    create_text_analysis_wordcloud
-                )
-                
-                # Comprehensive EDA dashboard
-                st.subheader("📊 Dataset Overview")
-                eda_dashboard = create_comprehensive_eda_dashboard(rec_df)
-                
-                if 'basic_stats' in eda_dashboard:
-                    stats = eda_dashboard['basic_stats']
-                    
-                    col1, col2, col3, col4 = st.columns(4)
-                    with col1:
-                        st.metric("Total Reviews", stats['total_companies'])
-                    with col2:
-                        st.metric("Recommended", stats['recommended'])
-                    with col3:
-                        st.metric("Recommendation Rate", f"{stats['recommendation_rate']:.1f}%")
-                    with col4:
-                        if stats['average_ratings']:
-                            avg_rating = list(stats['average_ratings'].values())[0] if stats['average_ratings'] else 0
-                            st.metric("Avg Overall Rating", f"{avg_rating:.2f}")
-                
-                # Market comparison charts
-                try:
-                    from utils.company_selection import create_market_comparison_charts, create_interactive_company_explorer
-                    from utils.enhanced_model_comparison import create_rating_gaps_visualization_pipeline
-                    
-                    st.subheader("📈 Market Comparison Analysis")
-                    market_charts = create_market_comparison_charts(rec_df)
-                    
-                    if 'error' not in market_charts:
-                        # Display market analysis charts
-                        chart_cols = st.columns(2)
-                        
-                        with chart_cols[0]:
-                            if 'rating_by_size' in market_charts:
-                                st.plotly_chart(market_charts['rating_by_size'], use_container_width=True)
-                        
-                        with chart_cols[1]:
-                            if 'market_benchmark' in market_charts:
-                                st.plotly_chart(market_charts['market_benchmark'], use_container_width=True)
-                        
-                        if 'rating_by_type' in market_charts:
-                            st.plotly_chart(market_charts['rating_by_type'], use_container_width=True)
-                        
-                        if 'recommendation_rate' in market_charts:
-                            st.plotly_chart(market_charts['recommendation_rate'], use_container_width=True)
-                    
-                    # Interactive company explorer
-                    st.subheader("🔍 Interactive Company Explorer")
-                    explorer_charts = create_interactive_company_explorer(rec_df)
-                    
-                    if 'error' not in explorer_charts:
-                        if 'rating_vs_salary' in explorer_charts:
-                            st.plotly_chart(explorer_charts['rating_vs_salary'], use_container_width=True)
-                        
-                        chart_cols2 = st.columns(2)
-                        
-                        with chart_cols2[0]:
-                            if 'company_radar' in explorer_charts:
-                                st.plotly_chart(explorer_charts['company_radar'], use_container_width=True)
-                        
-                        with chart_cols2[1]:
-                            if 'rating_heatmap' in explorer_charts:
-                                st.plotly_chart(explorer_charts['rating_heatmap'], use_container_width=True)
-                    
-                    # Rating gaps visualization pipeline
-                    st.subheader("📊 Rating Gaps Analysis (From Notebook)")
-                    gaps_charts = create_rating_gaps_visualization_pipeline(rec_df)
-                    
-                    if 'error' not in gaps_charts:
-                        if 'rating_gaps_distribution' in gaps_charts:
-                            st.plotly_chart(gaps_charts['rating_gaps_distribution'], use_container_width=True)
-                        
-                        chart_cols3 = st.columns(2)
-                        
-                        with chart_cols3[0]:
-                            if 'cluster_analysis' in gaps_charts:
-                                st.plotly_chart(gaps_charts['cluster_analysis'], use_container_width=True)
-                        
-                        with chart_cols3[1]:
-                            if 'recommendation_analysis' in gaps_charts:
-                                st.plotly_chart(gaps_charts['recommendation_analysis'], use_container_width=True)
-                
-                except Exception as market_error:
-                    st.warning(f"⚠️ Market analysis not available: {market_error}")
-                
-                # Original EDA charts
-                st.subheader("📊 Additional Data Analysis")
-                
-                if 'basic_stats' in eda_dashboard:
-                    stats = eda_dashboard['basic_stats']
-                    
-                    col1, col2, col3, col4 = st.columns(4)
-                    with col1:
-                        st.metric("Total Reviews", stats['total_companies'])
-                    with col2:
-                        st.metric("Recommended", stats['recommended'])
-                    with col3:
-                        st.metric("Recommendation Rate", f"{stats['recommendation_rate']:.1f}%")
-                    with col4:
-                        if stats['average_ratings']:
-                            avg_rating = list(stats['average_ratings'].values())[0] if stats['average_ratings'] else 0
-                            st.metric("Avg Overall Rating", f"{avg_rating:.2f}")
-                
-                # Display EDA charts
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    if 'summary_metrics' in eda_dashboard:
-                        st.plotly_chart(eda_dashboard['summary_metrics'], use_container_width=True)
-                
-                with col2:
-                    if 'industry_analysis' in eda_dashboard and eda_dashboard['industry_analysis']:
-                        st.plotly_chart(eda_dashboard['industry_analysis'], use_container_width=True)
-                
-                if 'size_analysis' in eda_dashboard and eda_dashboard['size_analysis']:
-                    st.plotly_chart(eda_dashboard['size_analysis'], use_container_width=True)
-                
-                # Rating distributions
-                st.subheader("📈 Rating Distributions")
-                rating_charts = create_rating_distribution_charts(rec_df)
-                if 'plotly_figure' in rating_charts:
-                    st.plotly_chart(rating_charts['plotly_figure'], use_container_width=True)
-                
-                # Rating gaps analysis
-                st.subheader("📊 Rating Gaps Analysis")
-                gaps_charts = create_rating_gaps_analysis(rec_df)
-                if 'plotly_figure' in gaps_charts:
-                    st.plotly_chart(gaps_charts['plotly_figure'], use_container_width=True)
-                
-                # Cluster analysis
-                st.subheader("🔍 Cluster Analysis")
-                cluster_charts = create_cluster_analysis_chart(rec_df)
-                
-                if 'cluster_distribution' in cluster_charts:
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.plotly_chart(cluster_charts['cluster_distribution'], use_container_width=True)
-                    
-                    if 'recommendations_by_cluster' in cluster_charts:
-                        with col2:
-                            st.plotly_chart(cluster_charts['recommendations_by_cluster'], use_container_width=True)
-                
-                # Recommendation analysis
-                st.subheader("🎯 Recommendation Analysis")
-                rec_charts = create_recommendation_analysis_charts(rec_df)
-                
-                for chart_name, chart_fig in rec_charts.items():
-                    if chart_name != 'error':
-                        st.plotly_chart(chart_fig, use_container_width=True)
-                
-                # Text analysis word cloud
-                st.subheader("💬 Text Analysis")
-                wordcloud_result = create_text_analysis_wordcloud(rec_df, 'What I liked')
-                
-                if wordcloud_result and 'matplotlib_figure' in wordcloud_result:
-                    st.pyplot(wordcloud_result['matplotlib_figure'])
-                else:
-                    st.info("💡 Word cloud not available - install wordcloud package for text visualization")
-                
-            except Exception as e:
-                st.error(f"❌ Error creating visualizations: {e}")
-                st.info("📊 Basic data overview available:")
-                
-                # Fallback basic analysis
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("Total Reviews", len(rec_df))
-                with col2:
-                    if 'Recommend' in rec_df.columns:
-                        recommended = rec_df['Recommend'].sum()
-                        st.metric("Recommended", recommended)
-                with col3:
-                    if 'Rating' in rec_df.columns:
-                        avg_rating = rec_df['Rating'].mean()
-                        st.metric("Avg Rating", f"{avg_rating:.2f}")
-        
+            df_performance = pd.DataFrame(model_data)
+            st.dataframe(df_performance, use_container_width=True)
+            
+            # Performance visualization
+            st.markdown("### 📊 Model Performance Comparison")
+            
+            # Create performance chart using matplotlib
+            fig, ax = plt.subplots(figsize=(12, 6))
+            
+            models_list = list(evaluation_results.keys())
+            metrics_list = ['CV_F1_Mean', 'Train_Accuracy', 'Train_Precision', 'Train_Recall']
+            metric_labels = ['F1 Score', 'Accuracy', 'Precision', 'Recall']
+            
+            x = np.arange(len(models_list))
+            width = 0.2
+            
+            for i, (metric, label) in enumerate(zip(metrics_list, metric_labels)):
+                values = [evaluation_results[model].get(metric, 0) for model in models_list]
+                ax.bar(x + i*width, values, width, label=label)
+            
+            ax.set_xlabel('Models')
+            ax.set_ylabel('Score')
+            ax.set_title('Model Performance Comparison')
+            ax.set_xticks(x + width * 1.5)
+            ax.set_xticklabels(models_list, rotation=45, ha='right')
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+            
+            st.pyplot(fig)
+            
         else:
-            st.error("❌ No data available for visualization")
+            st.warning("⚠️ Model performance data not available")
+            
+    except Exception as e:
+        st.error(f"Error loading model performance: {e}")
+        
+        # Fallback to show loaded models
+        if models:
+            st.markdown("### 🤖 Loaded Models")
+            for model_name in models.keys():
+                st.success(f"✅ {model_name}")
+        else:
+            st.warning("⚠️ No models loaded")
+
+
+def display_company_eda_tab(rec_df):
+    """Display EDA and visualization tab"""
+    st.markdown('<h3 class="tab-header">📊 Company Analysis & EDA</h3>', unsafe_allow_html=True)
+    
+    if rec_df is None or rec_df.empty:
+        st.error("❌ No data available for analysis")
+        return
+    
+    # Basic data info
+    st.markdown("### 📋 Dataset Overview")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Total Reviews", len(rec_df))
+    with col2:
+        unique_companies = rec_df['Company Name'].nunique() if 'Company Name' in rec_df.columns else 0
+        st.metric("Unique Companies", unique_companies)
+    with col3:
+        if 'Rating' in rec_df.columns:
+            avg_rating = rec_df['Rating'].mean()
+            st.metric("Average Rating", f"{avg_rating:.2f}")
+    with col4:
+        if 'Recommend' in rec_df.columns:
+            recommend_rate = rec_df['Recommend'].mean() * 100
+            st.metric("Recommend Rate", f"{recommend_rate:.1f}%")
+        else:
+            st.metric("Recommend Rate", "N/A")
+    
+    # Rating distribution
+    if 'Rating' in rec_df.columns:
+        st.markdown("### 📊 Rating Distribution")
+        
+        fig, ax = plt.subplots(figsize=(10, 6))
+        rec_df['Rating'].hist(bins=20, ax=ax, alpha=0.7, color='skyblue', edgecolor='black')
+        ax.set_xlabel('Rating')
+        ax.set_ylabel('Frequency')
+        ax.set_title('Distribution of Company Ratings')
+        ax.grid(True, alpha=0.3)
+        st.pyplot(fig)
+    
+    # Company size analysis
+    if 'Company size' in rec_df.columns:
+        st.markdown("### 🏢 Company Size Analysis")
+        
+        size_counts = rec_df['Company size'].value_counts()
+        
+        fig, ax = plt.subplots(figsize=(10, 6))
+        size_counts.plot(kind='bar', ax=ax, color='lightcoral')
+        ax.set_xlabel('Company Size')
+        ax.set_ylabel('Number of Reviews')
+        ax.set_title('Distribution by Company Size')
+        ax.tick_params(axis='x', rotation=45)
+        ax.grid(True, alpha=0.3)
+        st.pyplot(fig)
+    
+    # Market averages comparison
+    st.markdown("### 📈 Market Averages")
+    market_avg = get_market_averages()
+    
+    avg_data = []
+    for dimension, avg_value in market_avg.items():
+        avg_data.append({
+            "Dimension": dimension,
+            "Market Average": f"{avg_value:.2f}",
+            "Description": "Benchmark for comparison"
+        })
+    
+    avg_df = pd.DataFrame(avg_data)
+    st.dataframe(avg_df, use_container_width=True)
+
 
 def display_about_page():
-    """Display About page with author and team information"""
-    st.markdown('<h2 class="section-header">ℹ️ About</h2>', unsafe_allow_html=True)
+    """Display About page"""
+    st.markdown('<h2 class="section-header">ℹ️ About This Application</h2>', unsafe_allow_html=True)
     
-    # Author information
     st.markdown("""
-    <div class="author-info">
-        <h2>👨‍💼 Project Author</h2>
-        <h3>Đào Tuấn Thịnh (Thinh Dao)</h3>
-        <p><strong>📧 Email:</strong> daotuanthinh@gmail.com</p>
-        <p><strong>📱 Phone:</strong> (+84) 931770110</p>
-        <p><strong>💼 Position:</strong> Senior Data Analyst and Engagement</p>
-        <p><strong>🎓 GitHub:</strong> thinhdao276</p>
-        <p><strong>📍 Address:</strong> Thu Dau Mot, Binh Duong</p>
-    </div>
-    """, unsafe_allow_html=True)
+    ### 🎯 Project Overview
+    This application implements two comprehensive recommendation systems for ITViec company analysis:
     
-    # Professional summary
-    st.markdown("""
-    ### 💼 Professional Summary
+    #### **🔍 Content-Based Similarity System (Requirement 1)**
+    Find similar companies based on content description using multiple NLP approaches.
     
-    Highly motivated Senior Data Analyst with over 5 years of experience, including significant expertise in manufacturing environments and Supply Chain Management. Proven ability to leverage advanced data analytics, BI tools (DOMO, Python, SQL with a strong aptitude for rapidly learning tools like Tableau and Alteryx), and process automation to drive Supply Chain Excellence. Specialized in SCM KPI reporting and analysis, material requirement planning and fostering a data-driven culture in global and cross-functional teams.
+    #### **🎯 Recommendation Modeling System (Requirement 2)**  
+    Predict whether to recommend a company based on employee reviews and rating gaps.
     
-    ### 🎯 About Me
+    ### 🛠️ Technical Implementation
     
-    I am a passionate and dedicated professional with a strong background in data analysis, digital transformation, and supply chain. My journey has been marked by a continuous desire to learn and grow, both personally and professionally. I thrive in environments that challenge me and provide opportunities to create a meaningful impact.
+    #### **Content-Based Features:**
+    - **Data Sources**: Company overview, industry, key skills
+    - **Methods**: TF-IDF vectorization + Cosine similarity
+    - **Algorithms**: Scikit-learn & Gensim implementations
+    - **Advanced**: Doc2Vec, FastText, BERT embeddings
     
-    I love learning and always seek out professional environments where I can expand my knowledge and skills. My goal is to create a greater impact by sharing my knowledge and experiences with others, fostering a culture of continuous improvement and innovation.
+    #### **Recommendation Modeling Features:**  
+    - **Data Sources**: Employee reviews from final_data.xlsx
+    - **Innovation**: Rating Gap Analysis vs market average
+    - **Models**: Random Forest, LightGBM, CatBoost (90%+ accuracy)
+    - **Visualizations**: Spider charts, performance comparisons
     
-    ### 🎯 Threshold Methodology Explanation
+    ### 🚀 Technology Stack
+    - **Frontend**: Streamlit
+    - **ML Libraries**: Scikit-learn, LightGBM, CatBoost
+    - **Data Processing**: Pandas, NumPy
+    - **Visualization**: Matplotlib, Plotly
     
-    One of the key innovations in our recommendation system is the threshold calculation methodology. Here's how it works:
-    
+    ### 👥 Team Information
+    - **Đào Tuấn Thịnh** - daotuanthinh@gmail.com
+    - **Trương Văn Lê** - truongvanle999@gmail.com
+    - **Instructor: Khuất Thị Phương**
     """)
-    
-    # Add threshold explanation
-    try:
-        from utils.company_selection import get_threshold_explanation
-        threshold_explanation = get_threshold_explanation()
-        st.markdown(threshold_explanation)
-    except Exception as e:
-        st.markdown("""
-        #### 🎯 Threshold Calculation (Rating Gap Method)
-        
-        Our system uses **Rating Gap Analysis** instead of fixed thresholds:
-        
-        1. **Calculate Rating Gaps**: Compare each company's ratings to market averages
-        2. **Weighted Scoring**: Apply importance weights to different rating categories  
-        3. **Dynamic Recommendation**: Score > 0.5 means "better than market average"
-        4. **User Control**: Threshold slider lets users be more/less selective
-        
-        This approach is more sophisticated than traditional similarity thresholds because it considers market context and multiple dimensions of company performance.
-        """)
-    
-    # Skills section
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        ### 💻 Programming Skills
-        - **Python** (Advanced)
-        - **SQL** (Advanced)  
-        - **R** (Intermediate)
-        - **VBA** (Intermediate)
-        - **Google App Script** (Intermediate)
-        """)
-    
-    with col2:
-        st.markdown("""
-        ### 📊 Data & Analytics Skills
-        - Data Analysis & Visualization
-        - SCM KPI Reporting & Analysis
-        - Predictive Analytics
-        - Machine Learning
-        - ETL Processes
-        - Data Quality Management
-        """)
-    
-    # Team members
-    st.markdown("### 👥 Team Members")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        <div class="team-member">
-            <h4>Đào Tuấn Thịnh</h4>
-            <p><strong>📧 Email:</strong> daotuanthinh@gmail.com</p>
-            <p><strong>🎯 Role:</strong> Project Lead & Data Scientist</p>
-            <p><strong>💼 Responsibilities:</strong> System architecture, ML modeling, data analysis</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div class="team-member">
-            <h4>Trương Văn Lê</h4>
-            <p><strong>📧 Email:</strong> truongvanle999@gmail.com</p>
-            <p><strong>🎯 Role:</strong> Data Engineer & ML Developer</p>
-            <p><strong>💼 Responsibilities:</strong> Data preprocessing, feature engineering, model optimization</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Project information
-    st.markdown("### 🚀 Project Information")
-    
-    st.markdown("""
-    #### 📋 Project Overview
-    This comprehensive Company Recommendation System leverages advanced Natural Language Processing (NLP) and Machine Learning techniques to provide intelligent company recommendations for the ITViec platform.
-    
-    #### 🎯 Key Objectives
-    1. **Content-Based Similarity**: Find similar companies based on descriptions and skills
-    2. **ML-Powered Recommendations**: Predict company recommendations using advanced algorithms
-    3. **Data-Driven Insights**: Provide comprehensive EDA and visualization capabilities
-    
-    #### 🛠️ Technology Stack & Utils Functions
-    
-    ##### 📁 Core Functions from Utils Folder
-    
-    **🔧 preprocessing.py**
-    - `preprocess_text()` - Text cleaning and normalization
-    - `load_and_preprocess_data()` - Data loading with intelligent preprocessing
-    - `remove_stopwords()` - Vietnamese and English stopword removal
-    
-    **🤖 recommendation_sklearn.py**
-    - `build_sklearn_tfidf_model()` - TF-IDF vectorization using Scikit-learn
-    - `get_company_recommendations()` - Company-to-company similarity matching
-    - `get_text_based_recommendations()` - Text query to company matching
-    - `calculate_similarity_scores()` - Cosine similarity computation
-    
-    **🧬 recommendation_gensim.py**
-    - `build_gensim_dictionary_and_corpus()` - Gensim corpus construction
-    - `build_gensim_tfidf_model_and_index()` - Gensim TF-IDF model building
-    - `get_gensim_recommendations()` - Gensim-based similarity search
-    - `get_gensim_text_based_recommendations()` - Text-to-company matching via Gensim
-    
-    **📊 visualization.py**
-    - `create_similarity_chart()` - Interactive similarity score visualization
-    - `create_wordcloud()` - Word cloud generation for text analysis
-    - `create_industry_chart()` - Industry distribution visualization
-    - `plot_model_comparison()` - Multi-model performance comparison
-    
-    ##### 🎯 Advanced ML Models Implemented
-    - **Frontend**: Streamlit with advanced UI components
-    - **ML Libraries**: Scikit-learn, Gensim, LightGBM, CatBoost, XGBoost
-    - **NLP Models**: BERT, FastText, Doc2Vec, TF-IDF (2 variants)
-    - **Data Processing**: Pandas, NumPy with optimized pipelines
-    - **Visualization**: Plotly (interactive), Matplotlib, Seaborn, WordCloud
-    - **Performance**: Joblib for model persistence, caching for optimization
-    
-    #### 📊 Business Impact
-    - **Job Seekers**: Find companies with similar tech stacks or industries
-    - **Business Development**: Identify potential partners or competitors  
-    - **Market Research**: Analyze company landscapes and trends
-    - **Recruitment**: Discover companies with specific skill requirements
-    
-    #### 🎓 Academic Context
-    This project was developed as part of a comprehensive machine learning and data science course, demonstrating practical applications of NLP and ML in business contexts.
-    """)
-    
-    # Footer
-    st.markdown("---")
-    st.markdown("""
-    <div style="text-align: center; color: #666; margin-top: 2rem;">
-        <p>🏢 ITViec Company Recommendation System | 
-        📅 Developed in 2024 | 
-        🎓 Academic Project</p>
-        <p>💡 <em>Empowering career decisions through intelligent data analysis</em></p>
-    </div>
-    """, unsafe_allow_html=True)
+
 
 if __name__ == "__main__":
     main()
